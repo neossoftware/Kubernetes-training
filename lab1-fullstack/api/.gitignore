@@ -1,0 +1,26 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (nunca commitear valores reales)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Base de datos local de desarrollo
+*.db
+*.sqlite
+
+# macOS
+.DS_Store
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.sw?
