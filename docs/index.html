@@ -4046,6 +4046,216 @@ kubectl get namespaces</pre>
         </ul>
       </div>
 
+      <!-- ─── 2.4 Lab: Primer Deployment ─── -->
+      <div class="module">
+        <div class="mod-header">
+          <span class="mod-icon">⚙️</span>
+          <span class="mod-title">Lab 2-4 — Tu primer Deployment: 3 réplicas de nginx</span>
+          <span class="mod-duration">Semana 5 — Teoría + Lab</span>
+        </div>
+
+        <!-- Teoría: Deployment -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Qué es un Deployment?</span></div>
+          <div class="theory-body">
+            <p>En los labs anteriores creaste Pods directamente. El problema: si un Pod falla, <strong>nadie lo recupera</strong>. Un <strong>Deployment</strong> resuelve eso — describes el estado que quieres ("quiero 3 pods de nginx corriendo") y K8s se encarga de mantenerlo así para siempre.</p>
+            <p>El Deployment no crea los Pods directamente — crea un <strong>ReplicaSet</strong>, y el ReplicaSet crea y vigila los Pods. Si uno muere, el ReplicaSet crea otro inmediatamente.</p>
+
+            <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;margin:12px 0;font-family:var(--mono);font-size:12px;">
+              <div style="font-family:var(--sans);font-size:11px;font-weight:700;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Jerarquía de objetos</div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div style="background:#dbeafe;border:1.5px solid #93c5fd;border-radius:6px;padding:6px 14px;color:#1e40af;font-weight:700;">Deployment <span style="font-weight:400;font-size:11px;color:#3b82f6;">— describe el estado deseado</span></div>
+                <div style="padding-left:20px;color:#94a3b8;font-size:11px;">↓ gestiona</div>
+                <div style="background:#e0e7ff;border:1.5px solid #a5b4fc;border-radius:6px;padding:6px 14px;color:#3730a3;font-weight:700;margin-left:20px;">ReplicaSet <span style="font-weight:400;font-size:11px;color:#6366f1;">— mantiene el número de réplicas</span></div>
+                <div style="padding-left:40px;color:#94a3b8;font-size:11px;">↓ crea y vigila</div>
+                <div style="display:flex;gap:8px;margin-left:40px;">
+                  <div style="background:#dcfce7;border:1.5px solid #86efac;border-radius:6px;padding:5px 10px;color:#166534;font-size:11px;font-weight:700;">Pod 1</div>
+                  <div style="background:#dcfce7;border:1.5px solid #86efac;border-radius:6px;padding:5px 10px;color:#166534;font-size:11px;font-weight:700;">Pod 2</div>
+                  <div style="background:#dcfce7;border:1.5px solid #86efac;border-radius:6px;padding:5px 10px;color:#166534;font-size:11px;font-weight:700;">Pod 3</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Teoría: Réplicas -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Qué son las réplicas y para qué sirven?</span></div>
+          <div class="theory-body">
+            <p>Una <strong>réplica</strong> es una copia idéntica del mismo Pod corriendo al mismo tiempo. Tener 3 réplicas significa que hay 3 instancias de nginx funcionando en paralelo.</p>
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;">
+              <thead><tr style="background:#f1f5f9;"><th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Sin réplicas (1 Pod)</th><th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Con réplicas (3 Pods)</th></tr></thead>
+              <tbody>
+                <tr><td style="padding:6px 10px;border-bottom:1px solid #f8fafc;">Si el Pod muere → app caída</td><td style="padding:6px 10px;border-bottom:1px solid #f8fafc;">Si un Pod muere → los otros 2 siguen atendiendo</td></tr>
+                <tr><td style="padding:6px 10px;border-bottom:1px solid #f8fafc;">Todo el tráfico a un solo proceso</td><td style="padding:6px 10px;border-bottom:1px solid #f8fafc;">El Service distribuye el tráfico entre los 3</td></tr>
+                <tr><td style="padding:6px 10px;">Deploy = downtime</td><td style="padding:6px 10px;">Deploy = RollingUpdate sin downtime</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="lab-overview">
+          <div class="lab-overview-box lov-what">
+            <h4>¿Qué haremos?</h4>
+            <p>Crearemos un <strong>Deployment</strong> con <strong>3 réplicas de nginx</strong>, lo expondremos con un Service y comprobaremos que K8s recupera automáticamente un Pod cuando lo eliminamos a propósito.</p>
+          </div>
+          <div class="lab-overview-box lov-goals">
+            <h4>Objetivos de aprendizaje</h4>
+            <ul>
+              <li>Escribir un manifiesto de Deployment con <code>replicas: 3</code></li>
+              <li>Entender la diferencia entre Pod, ReplicaSet y Deployment</li>
+              <li>Escalar con <code>kubectl scale</code></li>
+              <li>Ver la autocuración: eliminar un Pod y que K8s lo recree</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Crear el manifiesto</span></div>
+          <div class="theory-body">
+            <p>Un Deployment tiene tres partes clave: cuántas <code>replicas</code>, el <code>selector</code> para encontrar sus Pods, y el <code>template</code> con la definición del Pod.</p>
+          </div>
+          <div class="filename">nginx-deployment.yaml</div>
+          <pre><span class="c"># ── Deployment ──────────────────────────────────</span>
+<span class="k">apiVersion:</span> apps/v1
+<span class="k">kind:</span> Deployment
+<span class="k">metadata:</span>
+  <span class="k">name:</span> nginx-deploy
+<span class="k">spec:</span>
+  <span class="k">replicas:</span> <span class="n">3</span>                <span class="c"># queremos 3 pods corriendo siempre</span>
+  <span class="k">selector:</span>
+    <span class="k">matchLabels:</span>
+      <span class="k">app:</span> nginx-deploy      <span class="c"># el Deployment gestiona Pods con este label</span>
+  <span class="k">template:</span>                    <span class="c"># plantilla para crear cada Pod</span>
+    <span class="k">metadata:</span>
+      <span class="k">labels:</span>
+        <span class="k">app:</span> nginx-deploy
+    <span class="k">spec:</span>
+      <span class="k">containers:</span>
+        - <span class="k">name:</span> nginx
+          <span class="k">image:</span> nginx:1.27-alpine
+          <span class="k">ports:</span>
+            - <span class="k">containerPort:</span> 80
+---
+<span class="c"># ── Service ─────────────────────────────────────</span>
+<span class="k">apiVersion:</span> v1
+<span class="k">kind:</span> Service
+<span class="k">metadata:</span>
+  <span class="k">name:</span> nginx-deploy-svc
+<span class="k">spec:</span>
+  <span class="k">selector:</span>
+    <span class="k">app:</span> nginx-deploy
+  <span class="k">type:</span> NodePort
+  <span class="k">ports:</span>
+    - <span class="k">port:</span> 80
+      <span class="k">targetPort:</span> 80
+      <span class="k">nodePort:</span> 30091</pre>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Aplicar y verificar los 3 Pods</span></div>
+          <pre>kubectl apply -f nginx-deployment.yaml
+
+<span class="c"># Ver el Deployment</span>
+kubectl get deployments
+<span class="c"># NAME           READY   UP-TO-DATE   AVAILABLE   AGE</span>
+<span class="c"># nginx-deploy   3/3     3            3           10s</span>
+<span class="c">#                ^^^</span>
+<span class="c">#                3 pods listos de 3 deseados</span>
+
+<span class="c"># Ver los 3 Pods creados por el Deployment</span>
+kubectl get pods
+<span class="c"># NAME                            READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># nginx-deploy-7d6b8c9f4-abcde    1/1     Running   0          12s</span>
+<span class="c"># nginx-deploy-7d6b8c9f4-fghij    1/1     Running   0          12s</span>
+<span class="c"># nginx-deploy-7d6b8c9f4-klmno    1/1     Running   0          12s</span>
+<span class="c"># ^^^^^^^^^^^^^^^^^^^^^^^^^</span>
+<span class="c"># nombre = deployment + replicaset-hash + pod-hash (generados automáticamente)</span>
+
+<span class="c"># Ver el ReplicaSet creado por el Deployment</span>
+kubectl get replicasets
+<span class="c"># NAME                       DESIRED   CURRENT   READY   AGE</span>
+<span class="c"># nginx-deploy-7d6b8c9f4     3         3         3       12s</span></pre>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Probar la autocuración — elimina un Pod a propósito</span></div>
+          <div class="theory-body">
+            <p>Elimina uno de los Pods y observa cómo K8s lo recrea en segundos. Esto es la <strong>autocuración</strong> (self-healing) de Kubernetes.</p>
+          </div>
+          <pre><span class="c"># Copia el nombre de uno de los pods del paso anterior y elimínalo</span>
+kubectl delete pod nginx-deploy-7d6b8c9f4-abcde
+
+<span class="c"># Inmediatamente mira cómo K8s crea uno nuevo</span>
+kubectl get pods
+<span class="c"># NAME                            READY   STATUS              AGE</span>
+<span class="c"># nginx-deploy-7d6b8c9f4-fghij    1/1     Running             45s</span>
+<span class="c"># nginx-deploy-7d6b8c9f4-klmno    1/1     Running             45s</span>
+<span class="c"># nginx-deploy-7d6b8c9f4-xyzab    0/1     ContainerCreating   2s   ← nuevo Pod</span>
+
+<span class="c"># El Deployment sigue mostrando 3/3</span>
+kubectl get deployments</pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <div class="step-ok">El ReplicaSet detectó que había solo 2 Pods y creó uno nuevo para volver al estado deseado (3). Esto es exactamente lo que diferencia un Deployment de un Pod directo.</div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Escalar el Deployment</span></div>
+          <div class="theory-body">
+            <p>Puedes cambiar el número de réplicas en cualquier momento sin downtime.</p>
+          </div>
+          <pre><span class="c"># Escalar a 5 réplicas</span>
+kubectl scale deployment nginx-deploy --replicas=5
+kubectl get pods
+<span class="c"># Verás 5 pods corriendo</span>
+
+<span class="c"># Reducir a 2 réplicas</span>
+kubectl scale deployment nginx-deploy --replicas=2
+kubectl get pods
+<span class="c"># K8s termina 3 pods y deja 2 corriendo</span>
+
+<span class="c"># También puedes editar el YAML y volver a aplicar</span>
+<span class="c"># Cambia replicas: 2 en nginx-deployment.yaml y:</span>
+kubectl apply -f nginx-deployment.yaml</pre>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 5</span><span class="theory-title">Acceder desde el navegador</span></div>
+          <pre><span class="c">## Docker Desktop</span>
+<span class="c"># http://localhost:30091</span>
+
+<span class="c">## minikube</span>
+minikube service nginx-deploy-svc --url</pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <p>Cada vez que recargues, el Service está distribuyendo la petición entre los Pods disponibles (round-robin). Todos responden igual porque usan la misma imagen.</p>
+          </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Limpiar</span></div>
+          <pre>kubectl delete -f nginx-deployment.yaml
+
+kubectl get pods
+kubectl get deployments</pre>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear <code>nginx-deployment.yaml</code> con <code>replicas: 3</code> y aplicarlo</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Verificar 3 Pods Running y el ReplicaSet con <code>kubectl get replicasets</code></span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Eliminar un Pod a propósito y ver cómo K8s lo recrea (autocuración)</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Escalar a 5 réplicas con <code>kubectl scale</code> y volver a 2</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la jerarquía: Deployment → ReplicaSet → Pods</span><span class="ttag tt-theory">teoría</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Limpiar con <code>kubectl delete -f nginx-deployment.yaml</code></span><span class="ttag tt-lab">lab</span></li>
+        </ul>
+      </div>
+
       <!-- ─── 2.3 LAB 2-A ─── -->
       <div class="module">
         <div class="mod-header">
