@@ -4718,6 +4718,10 @@ kubectl describe secret db-secret
 
 <span class="c"># Para decodificar manualmente:</span>
 kubectl get secret db-secret -o jsonpath='{.data.DB_USER}' | base64 -d
+<span class="c"># admin%  ← el % final es normal en zsh: indica que no hay salto de línea, no es parte del valor</span>
+
+<span class="c"># Si quieres que no aparezca el %:</span>
+kubectl get secret db-secret -o jsonpath='{.data.DB_USER}' | base64 -d && echo
 <span class="c"># admin</span></pre>
         </div>
 
