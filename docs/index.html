@@ -5004,6 +5004,27 @@ kubectl rollout history deployment/products-api
             </table>
             <p style="font-size:.85rem;color:#1e3a8a;margin:12px 0 0 0;">En el <strong>Lab 2-6</strong> usamos <code>rollout restart</code> porque los Pods habían crasheado — no cambió la imagen, solo necesitaban reiniciarse una vez que PostgreSQL estuvo listo.</p>
           </div>
+
+          <!-- Verificar versión corriendo -->
+          <div style="background:#eff6ff;border:1.5px solid #3b82f6;border-radius:10px;padding:18px;margin:16px 0;">
+            <div style="font-weight:700;color:#1e40af;margin-bottom:10px;">🔍 ¿Cómo saber qué versión está corriendo?</div>
+            <pre style="margin:0;background:#dbeafe;border-radius:6px;padding:12px;font-size:.85rem;color:#1e3a8a;"><span class="c"># Opción 1 — imagen exacta en una línea (el más útil)</span>
+kubectl get deployment products-api -o jsonpath='{.spec.template.spec.containers[0].image}'
+<span class="c"># lab2-7-products-api:v2</span>
+
+<span class="c"># Opción 2 — columna IMAGE junto al estado</span>
+kubectl get deployment products-api -o wide
+
+<span class="c"># Opción 3 — imagen + estado + eventos</span>
+kubectl describe deployment products-api | grep Image
+<span class="c">#   Image: lab2-7-products-api:v2</span>
+
+<span class="c"># Opción 4 — historial de revisiones</span>
+kubectl rollout history deployment/products-api
+<span class="c"># REVISION  CHANGE-CAUSE</span>
+<span class="c"># 1         &lt;none&gt;   ← v1 (lab2-6-products-api:1.0)</span>
+<span class="c"># 2         &lt;none&gt;   ← v2 actual (lab2-7-products-api:v2)</span></pre>
+          </div>
         </div>
 
         <!-- Step 5 -->
