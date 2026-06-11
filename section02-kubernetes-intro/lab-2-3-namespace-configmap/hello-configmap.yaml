@@ -26,8 +26,8 @@ data:
     <body>
       <div class="card">
         <h1>☸ Hello from Kubernetes!</h1>
-        <p>Tu primer Pod corriendo en el cluster.</p>
-        <div class="badge">nginx · Lab 2-0</div>
+        <p>Usando config Map para inyectar funcionalidad al POD.</p>
+        <div class="badge">nginx · Lab 2-3</div>
       </div>
     </body>
     </html>

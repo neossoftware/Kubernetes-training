@@ -3558,12 +3558,117 @@ kubectl get svc
         </ul>
       </div>
 
-      <!-- ─── 2.2 Lab 2-0: Hello World ─── -->
+      <!-- ─── 2.3 Lab: Namespace + ConfigMap ─── -->
       <div class="module">
         <div class="mod-header">
-          <span class="mod-icon">👋</span>
-          <span class="mod-title">Lab 2-0 — Hello World en Kubernetes: tu primer Pod</span>
-          <span class="mod-duration">Semana 4 — Lab práctico introductorio</span>
+          <span class="mod-icon">🗂️</span>
+          <span class="mod-title">Lab 2-3 — Comprende Namespace y ConfigMap</span>
+          <span class="mod-duration">Semana 4 — Teoría + Lab</span>
+        </div>
+
+        <!-- Teoría: Namespace -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Qué es un Namespace?</span></div>
+          <div class="theory-body">
+            <p>Un <strong>Namespace</strong> es una partición lógica dentro de un cluster de Kubernetes. Imagina que tienes un edificio (el cluster) con varios pisos independientes — cada piso es un Namespace. Lo que está en el piso 2 no interfiere con el piso 3, aunque compartan el mismo edificio.</p>
+            <p>Sirven para <strong>separar entornos</strong> (desarrollo, staging, producción), <strong>separar equipos</strong> (frontend, backend, datos), y aplicar <strong>límites de recursos y permisos</strong> por separado.</p>
+
+            <!-- Diagrama Namespace -->
+            <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;margin:12px 0;overflow-x:auto;">
+              <div style="text-align:center;font-family:var(--sans);font-size:11px;font-weight:700;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;">☸ Kubernetes Cluster</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+
+                <div style="border:2px solid #3b82f6;border-radius:8px;overflow:hidden;">
+                  <div style="background:#3b82f6;color:white;padding:5px 10px;font-family:var(--sans);font-size:10.5px;font-weight:700;text-align:center;">ns: default</div>
+                  <div style="padding:8px;background:#eff6ff;">
+                    <div style="background:#bfdbfe;border-radius:5px;padding:3px 7px;font-family:var(--mono);font-size:10px;margin-bottom:4px;">Pod: web</div>
+                    <div style="background:#bfdbfe;border-radius:5px;padding:3px 7px;font-family:var(--mono);font-size:10px;">Pod: api</div>
+                  </div>
+                </div>
+
+                <div style="border:2px solid #059669;border-radius:8px;overflow:hidden;">
+                  <div style="background:#059669;color:white;padding:5px 10px;font-family:var(--sans);font-size:10.5px;font-weight:700;text-align:center;">ns: staging</div>
+                  <div style="padding:8px;background:#f0fdf4;">
+                    <div style="background:#bbf7d0;border-radius:5px;padding:3px 7px;font-family:var(--mono);font-size:10px;margin-bottom:4px;">Pod: web</div>
+                    <div style="background:#bbf7d0;border-radius:5px;padding:3px 7px;font-family:var(--mono);font-size:10px;">Pod: api</div>
+                  </div>
+                </div>
+
+                <div style="border:2px solid #7c3aed;border-radius:8px;overflow:hidden;">
+                  <div style="background:#7c3aed;color:white;padding:5px 10px;font-family:var(--sans);font-size:10.5px;font-weight:700;text-align:center;">ns: hello</div>
+                  <div style="padding:8px;background:#f5f3ff;">
+                    <div style="background:#ddd6fe;border-radius:5px;padding:3px 7px;font-family:var(--mono);font-size:10px;margin-bottom:4px;">Pod: hello-pod</div>
+                    <div style="background:#ddd6fe;border-radius:5px;padding:3px 7px;font-family:var(--mono);font-size:10px;">Svc: hello-svc</div>
+                  </div>
+                </div>
+
+              </div>
+              <div style="text-align:center;font-family:var(--sans);font-size:11px;color:#94a3b8;margin-top:10px;">Cada Namespace está aislado — el Pod "web" de <em>default</em> y el de <em>staging</em> no se confunden entre sí.</div>
+            </div>
+
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px;">
+              <thead><tr style="background:#f1f5f9;"><th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Namespace</th><th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Qué contiene</th></tr></thead>
+              <tbody>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f8fafc;"><code>default</code></td><td style="padding:5px 10px;border-bottom:1px solid #f8fafc;">Donde van tus recursos si no especificas namespace</td></tr>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f8fafc;"><code>kube-system</code></td><td style="padding:5px 10px;border-bottom:1px solid #f8fafc;">Componentes internos de K8s (API Server, scheduler…). No tocar.</td></tr>
+                <tr><td style="padding:5px 10px;"><code>hello</code> (este lab)</td><td style="padding:5px 10px;">El que crearemos — todos los recursos del lab van aquí y se borran con un solo <code>kubectl delete namespace hello</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Teoría: ConfigMap -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Qué es un ConfigMap?</span></div>
+          <div class="theory-body">
+            <p>Un <strong>ConfigMap</strong> es un objeto de Kubernetes que almacena configuración en formato clave-valor, separada del container. En lugar de meter el contenido dentro de la imagen Docker, lo guardas en K8s y lo inyectas al Pod en tiempo de ejecución.</p>
+            <p>Esto resuelve un problema real: si quieres cambiar un archivo de configuración, no tienes que reconstruir y re-publicar la imagen — solo actualizas el ConfigMap.</p>
+
+            <!-- Diagrama ConfigMap -->
+            <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;margin:12px 0;">
+              <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:center;">
+
+                <!-- ConfigMap -->
+                <div style="border:2px solid #f59e0b;border-radius:8px;overflow:hidden;">
+                  <div style="background:#f59e0b;color:white;padding:6px 12px;font-family:var(--sans);font-size:10.5px;font-weight:700;">📋 ConfigMap: hello-html</div>
+                  <div style="background:#fffbeb;padding:10px 12px;font-family:var(--mono);font-size:10.5px;line-height:1.8;">
+                    <span style="color:#7c3aed;font-weight:600;">data:</span><br>
+                    &nbsp;&nbsp;<span style="color:#7c3aed;font-weight:600;">index.html:</span> <span style="color:#059669;">|</span><br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#64748b;">&lt;!DOCTYPE html&gt;</span><br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#64748b;">&lt;h1&gt;Hello K8s!&lt;/h1&gt;</span>
+                  </div>
+                </div>
+
+                <!-- Arrow -->
+                <div style="display:flex;flex-direction:column;align-items:center;padding:0 14px;gap:4px;">
+                  <div style="font-family:var(--sans);font-size:10px;font-weight:700;color:#64748b;text-align:center;">montado<br>como volumen</div>
+                  <div style="font-size:20px;color:#64748b;">→</div>
+                </div>
+
+                <!-- Pod -->
+                <div style="border:2px solid #059669;border-radius:8px;overflow:hidden;">
+                  <div style="background:#059669;color:white;padding:6px 12px;font-family:var(--sans);font-size:10.5px;font-weight:700;">📦 Pod: hello-pod</div>
+                  <div style="background:#f0fdf4;padding:10px 12px;font-family:var(--mono);font-size:10.5px;line-height:1.8;">
+                    <span style="color:#7c3aed;font-weight:600;">volumeMounts:</span><br>
+                    &nbsp;&nbsp;<span style="color:#7c3aed;font-weight:600;">mountPath:</span><br>
+                    &nbsp;&nbsp;<span style="color:#1e293b;">/usr/share/nginx/html</span><br>
+                    <span style="color:#64748b;font-size:9.5px;">← nginx sirve desde aquí</span>
+                  </div>
+                </div>
+
+              </div>
+              <div style="text-align:center;font-family:var(--sans);font-size:11px;color:#94a3b8;margin-top:10px;">K8s monta el contenido del ConfigMap como si fuera un archivo dentro del container.</div>
+            </div>
+
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px;">
+              <thead><tr style="background:#f1f5f9;"><th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Sin ConfigMap</th><th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Con ConfigMap</th></tr></thead>
+              <tbody>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f8fafc;">El archivo está dentro de la imagen Docker</td><td style="padding:5px 10px;border-bottom:1px solid #f8fafc;">El archivo vive en K8s, separado de la imagen</td></tr>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f8fafc;">Cambiar el archivo = rebuild + push de imagen</td><td style="padding:5px 10px;border-bottom:1px solid #f8fafc;">Cambiar el archivo = solo actualizar el ConfigMap</td></tr>
+                <tr><td style="padding:5px 10px;">La misma imagen para todos los entornos es difícil</td><td style="padding:5px 10px;">Misma imagen, diferente ConfigMap por entorno</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="lab-overview">
@@ -3642,7 +3747,7 @@ kubectl get namespaces</pre>
       &lt;div class="card"&gt;
         &lt;h1&gt;&#9096; Hello from Kubernetes!&lt;/h1&gt;
         &lt;p&gt;Tu primer Pod corriendo en el cluster.&lt;/p&gt;
-        &lt;div class="badge"&gt;nginx · Lab 2-0&lt;/div&gt;
+        &lt;div class="badge"&gt;nginx · Lab 2-3&lt;/div&gt;
       &lt;/div&gt;
     &lt;/body&gt;
     &lt;/html&gt;</pre>
