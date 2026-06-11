@@ -24,7 +24,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:3000
+        VITE_API_URL: ""   # same-origin — nginx proxy_pass a api:3000
     container_name: lab1-frontend
     ports:
       - "80:80"

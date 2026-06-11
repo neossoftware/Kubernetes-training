@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// VITE_API_URL='' (vacío) → same-origin, nginx hace el proxy a la API
+// ?? en vez de || para que string vacío no caiga al fallback
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 function ProductCard({ product, onDelete }) {
   return (

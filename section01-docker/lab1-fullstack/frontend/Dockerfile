@@ -5,7 +5,9 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 # La API_URL será inyectada en build time o via nginx
-ARG VITE_API_URL=http://localhost:3000
+# VITE_API_URL vacío = same-origin: el browser llama a /api/... sin host
+# nginx hace proxy_pass a "api:3000" (Docker Compose) o "api-svc:3000" (K8s)
+ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
