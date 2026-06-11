@@ -4976,6 +4976,34 @@ kubectl rollout history deployment/products-api
 <span class="c"># REVISION  CHANGE-CAUSE</span>
 <span class="c"># 1         &lt;none&gt;   ← api-deployment.yaml    (lab2-6-products-api:1.0)</span>
 <span class="c"># 2         &lt;none&gt;   ← api-deployment-v2.yaml (lab2-7-products-api:v2)</span></pre>
+
+          <!-- Cuadro azul: rollout restart vs apply nueva imagen -->
+          <div style="background:#eff6ff;border:1.5px solid #3b82f6;border-radius:10px;padding:18px;margin:16px 0;">
+            <div style="font-weight:700;color:#1e40af;margin-bottom:10px;">📘 ¿Cuándo usar rollout restart vs kubectl apply?</div>
+            <p style="font-size:.88rem;color:#1e3a8a;margin:0 0 12px 0;">Ambos hacen un rolling replace de Pods, pero con propósitos distintos:</p>
+            <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+              <thead>
+                <tr style="background:#dbeafe;">
+                  <th style="padding:8px 12px;text-align:left;color:#1e40af;border-bottom:2px solid #93c5fd;">Comando</th>
+                  <th style="padding:8px 12px;text-align:left;color:#1e40af;border-bottom:2px solid #93c5fd;">¿Qué cambia?</th>
+                  <th style="padding:8px 12px;text-align:left;color:#1e40af;border-bottom:2px solid #93c5fd;">¿Para qué sirve?</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid #bfdbfe;">
+                  <td style="padding:8px 12px;color:#1e3a8a;"><code>kubectl rollout restart</code></td>
+                  <td style="padding:8px 12px;color:#1e3a8a;">Nada en el spec — solo reinicia los Pods</td>
+                  <td style="padding:8px 12px;color:#1e3a8a;">Pods en CrashLoopBackOff, forzar lectura de un ConfigMap actualizado</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 12px;color:#1e3a8a;"><code>kubectl apply -f v2.yaml</code></td>
+                  <td style="padding:8px 12px;color:#1e3a8a;">La imagen (o cualquier campo del spec)</td>
+                  <td style="padding:8px 12px;color:#1e3a8a;">Desplegar una nueva versión del contenedor</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size:.85rem;color:#1e3a8a;margin:12px 0 0 0;">En el <strong>Lab 2-6</strong> usamos <code>rollout restart</code> porque los Pods habían crasheado — no cambió la imagen, solo necesitaban reiniciarse una vez que PostgreSQL estuvo listo.</p>
+          </div>
         </div>
 
         <!-- Step 5 -->
