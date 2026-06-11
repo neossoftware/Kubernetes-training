@@ -4743,6 +4743,19 @@ kubectl get pods -l app=products-api
 kubectl logs -l app=products-api --tail=5
 <span class="c"># HikariPool-1 - Start completed.</span>
 <span class="c"># Tomcat started on port 8080</span></pre>
+          <div style="background:#fef9c3;border:1.5px solid #facc15;border-radius:10px;padding:14px 18px;margin-top:12px;color:#713f12;">
+            <strong>⚠️ CrashLoopBackOff — ¿qué hacer si los pods fallan?</strong><br><br>
+            Si los pods arrancaron <strong>antes de que la BD estuviera lista</strong>, Spring Boot no puede conectar y el pod muere. K8s lo intenta reiniciar varias veces hasta dejarlo en <code>CrashLoopBackOff</code>:
+            <pre style="background:#fef3c7;border:none;margin:10px 0 6px;padding:8px 12px;border-radius:6px;color:#92400e;">products-api-xxxx-aaaaa   0/1   CrashLoopBackOff   5 (2m ago)   6m</pre>
+            Primero confirma que la BD ya está corriendo y acepta conexiones, luego reinicia el Deployment — K8s recreará los pods desde cero:
+            <pre style="background:#fef3c7;border:none;margin:10px 0 6px;padding:8px 12px;border-radius:6px;color:#92400e;">docker exec postgres-lab pg_isready -U admin -d labdb
+<span style="color:#78350f;"># localhost:5432 - accepting connections</span>
+
+kubectl rollout restart deployment/products-api
+kubectl get pods -l app=products-api -w
+<span style="color:#78350f;"># products-api-yyyy-aaaaa   1/1   Running   0   15s  ← pods nuevos</span></pre>
+            <strong>La lección:</strong> <code>CrashLoopBackOff</code> no significa que K8s está roto — es K8s diciéndote que la app no puede arrancar. Los logs te dan el motivo exacto: <code>kubectl logs &lt;pod&gt;</code>.
+          </div>
         </div>
 
         <!-- Step 5 -->

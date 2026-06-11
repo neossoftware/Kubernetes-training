@@ -172,6 +172,33 @@ kubectl get pods -l app=products-api
 
 ---
 
+## Troubleshooting — CrashLoopBackOff
+
+Si los pods arrancaron antes de que la BD estuviera lista, Spring Boot no puede
+conectar y K8s los deja en `CrashLoopBackOff`:
+
+```bash
+kubectl get pods -l app=products-api
+# products-api-xxxx-aaaaa   0/1   CrashLoopBackOff   5 (2m ago)   6m
+```
+
+Primero confirma que la BD acepta conexiones, luego reinicia el Deployment:
+
+```bash
+docker exec postgres-lab pg_isready -U admin -d labdb
+# localhost:5432 - accepting connections
+
+kubectl rollout restart deployment/products-api
+kubectl get pods -l app=products-api -w
+# products-api-yyyy-aaaaa   1/1   Running   0   15s  ← pods nuevos, sin errores
+```
+
+> **La lección:** `CrashLoopBackOff` no significa que K8s está roto — es K8s
+> diciéndote que la app no puede arrancar. Los logs dan el motivo exacto:
+> `kubectl logs <nombre-del-pod>`
+
+---
+
 ## Step 4 — Verificar logs de conexión a la BD
 
 ```bash
