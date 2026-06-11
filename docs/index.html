@@ -4455,6 +4455,11 @@ kubectl get pods</pre>
           </div>
         </div>
 
+        <!-- Note before Step 6 -->
+        <div class="step-note" style="background:#fefce8;border:1.5px solid #facc15;border-radius:10px;padding:14px 18px;margin:0 0 12px;color:#713f12;">
+          <strong>📌 Nota:</strong> Kubernetes incluye una funcionalidad llamada <strong>rollout undo</strong> que permite revertir un Deployment a una versión anterior con un solo comando. Sin embargo, esta función <strong>no aplica para cambios en ConfigMaps</strong> — los ConfigMaps son objetos independientes y no forman parte del historial de revisiones del Deployment. Veremos cómo usar <code>rollout undo</code> correctamente más adelante en el curso, cuando trabajemos con actualizaciones de imagen de contenedor.
+        </div>
+
         <!-- Step 6 -->
         <div class="theory-block">
           <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Actualiza el ConfigMap para cambiar la apariencia de la aplicación</span></div>
