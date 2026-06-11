@@ -4500,6 +4500,195 @@ kubectl delete -f nginx-configmap.yaml</pre>
         </ul>
       </div>
 
+      <!-- ─── LAB 2-6 FULLSTACK ─── -->
+      <div class="module">
+        <div class="mod-header">
+          <span class="mod-icon">🔗</span>
+          <span class="mod-title">Lab 2-6 — Fullstack en Kubernetes: Frontend + API con Services</span>
+          <span class="mod-duration">Semana 3 — Lab completo</span>
+        </div>
+
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Concepto</span><span class="theory-title">¿Cómo se comunican dos servicios en Kubernetes?</span></div>
+          <div class="theory-body">
+            <p>En Docker Compose, el browser llamaba directo a <code>http://localhost:3000</code> para la API. En Kubernetes eso cambia: cada servicio vive en su propio Pod, con su propia IP interna. La comunicación entre servicios se hace a través de <strong>Services</strong>.</p>
+            <p style="margin-top:10px;">Este lab tiene dos tipos de Service en acción al mismo tiempo:</p>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
+            <div style="background:#f0f9ff;border:1.5px solid #38bdf8;border-radius:10px;padding:16px;">
+              <div style="font-weight:700;color:#0369a1;margin-bottom:6px;">NodePort — acceso externo</div>
+              <div style="font-size:.9rem;color:#0c4a6e;">El frontend se expone en <code>localhost:30080</code>. Desde ahí el browser carga la app React.</div>
+            </div>
+            <div style="background:#f0fdf4;border:1.5px solid #4ade80;border-radius:10px;padding:16px;">
+              <div style="font-weight:700;color:#166534;margin-bottom:6px;">ClusterIP — comunicación interna</div>
+              <div style="font-size:.9rem;color:#14532d;">La API solo es accesible desde dentro del clúster con el nombre DNS <code>api-svc</code>. El browser jamás la toca directamente.</div>
+            </div>
+          </div>
+          <div class="theory-body">
+            <p><strong>El puente:</strong> nginx (dentro del frontend Pod) hace <code>proxy_pass</code> — cuando el browser pide <code>/api/products</code>, nginx lo reenvía internamente a <code>http://api-svc:3000/api/products</code>. K8s resuelve el DNS <code>api-svc</code> al ClusterIP correcto.</p>
+          </div>
+        </div>
+
+        <!-- Diagrama de arquitectura -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Diagrama</span><span class="theory-title">Flujo de comunicación</span></div>
+          <pre style="font-size:.82rem;line-height:1.7;">  Tu navegador
+       │
+       │  http://localhost:30080
+       ▼
+┌─────────────────────────┐
+│  frontend-svc           │  NodePort 30080  ← único acceso externo
+│  (NodePort)             │
+└──────────┬──────────────┘
+           │
+           ▼
+┌─────────────────────────┐
+│  frontend-deploy        │  2 réplicas nginx
+│  Pod 1 / Pod 2          │  sirve el build de React
+└──────────┬──────────────┘
+           │  /api/* → proxy_pass http://api-svc:3000
+           │  (tráfico interno — el browser no sabe nada de esto)
+           ▼
+┌─────────────────────────┐
+│  api-svc                │  ClusterIP  ← NO accesible desde fuera
+│  (ClusterIP)            │  K8s DNS: api-svc resuelve al ClusterIP
+└──────────┬──────────────┘
+           │
+           ▼
+┌─────────────────────────┐
+│  api-deploy             │  2 réplicas Node.js Express
+│  Pod 1 / Pod 2          │  /api/products · /api/hello
+└─────────────────────────┘</pre>
+        </div>
+
+        <div class="lab-block">
+          <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-6 — React + Node.js API fullstack en K8s</span></div>
+          <div class="lab-content">
+
+        <!-- Step 1 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Construir las imágenes Docker locales</span></div>
+          <div class="theory-body">
+            <p>Las imágenes se construyen localmente. Docker Desktop comparte el daemon de Docker con K8s, así que con <code>imagePullPolicy: Never</code> K8s las usa directamente sin buscarlas en Docker Hub.</p>
+          </div>
+          <pre><span class="c"># Desde la carpeta del lab</span>
+cd section02-kubernetes-intro/lab-2-6-fullstack
+
+<span class="c"># Imagen de la API (Node.js Express)</span>
+docker build -t lab2-6-api:1.0 ./api
+
+<span class="c"># Imagen del frontend (React build + nginx con proxy)</span>
+docker build -t lab2-6-frontend:1.0 ./frontend
+
+<span class="c"># Verificar que existen las dos imágenes</span>
+docker images | grep lab2-6
+<span class="c"># lab2-6-frontend   1.0   ...</span>
+<span class="c"># lab2-6-api        1.0   ...</span></pre>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Desplegar en Kubernetes</span></div>
+          <pre><span class="c"># API primero — el frontend necesita que el Service api-svc exista</span>
+kubectl apply -f k8s/api-deployment.yaml
+<span class="c"># deployment.apps/api-deploy created</span>
+<span class="c"># service/api-svc created</span>
+
+<span class="c"># Frontend</span>
+kubectl apply -f k8s/frontend-deployment.yaml
+<span class="c"># deployment.apps/frontend-deploy created</span>
+<span class="c"># service/frontend-svc created</span></pre>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Verificar Pods y Services</span></div>
+          <pre><span class="c"># Ver los 4 Pods — 2 de API + 2 de frontend</span>
+kubectl get pods
+<span class="c"># NAME                              READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># api-deploy-xxxx-aaaaa             1/1     Running   0          15s</span>
+<span class="c"># api-deploy-xxxx-bbbbb             1/1     Running   0          15s</span>
+<span class="c"># frontend-deploy-xxxx-ccccc        1/1     Running   0          12s</span>
+<span class="c"># frontend-deploy-xxxx-ddddd        1/1     Running   0          12s</span>
+
+<span class="c"># Ver los Services y sus tipos</span>
+kubectl get services
+<span class="c"># NAME           TYPE        CLUSTER-IP      PORT(S)          AGE</span>
+<span class="c"># api-svc        ClusterIP   10.96.x.x       3000/TCP         20s  ← sin EXTERNAL-IP</span>
+<span class="c"># frontend-svc   NodePort    10.97.x.x       80:30080/TCP     17s  ← expuesto en 30080</span></pre>
+          <div class="theory-body" style="margin-top:10px;">
+            <p>Fíjate: <code>api-svc</code> es <strong>ClusterIP</strong> — sin puerto externo, nadie fuera del clúster puede accederle. <code>frontend-svc</code> es <strong>NodePort</strong> — expuesto en tu máquina en el puerto 30080.</p>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Abrir la app y comprobar que la API responde</span></div>
+          <div class="theory-body">
+            <p><strong>Docker Desktop:</strong> abre <code>http://localhost:30080</code></p>
+            <p>Verás la app de productos con un banner azul que muestra el <strong>hostname del Pod de la API</strong>. Recarga varias veces — el hostname cambia entre los 2 pods (K8s balancea la carga automáticamente).</p>
+          </div>
+          <pre><span class="c"># minikube:</span>
+minikube service frontend-svc --url</pre>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 5</span><span class="theory-title">Comprobar que la API NO es accesible desde fuera</span></div>
+          <div class="theory-body">
+            <p>Una de las ventajas de <strong>ClusterIP</strong>: la API está protegida, solo el frontend puede hablarle. Compruébalo:</p>
+          </div>
+          <pre><span class="c"># La API no tiene NodePort — intentar llegar desde el browser falla</span>
+kubectl get service api-svc
+<span class="c"># TYPE: ClusterIP  ← sin puerto externo, sin acceso desde fuera</span>
+
+<span class="c"># Pero sí funciona desde DENTRO del clúster con su nombre DNS</span>
+kubectl run test-curl --image=curlimages/curl --restart=Never --rm -it \
+  -- curl http://api-svc:3000/api/hello
+<span class="c"># {"msg":"¡Hola desde Kubernetes Ninja Lab!","hostname":"api-deploy-xxxx-aaaaa"}</span></pre>
+          <div class="theory-body" style="margin-top:10px;">
+            <p>K8s resuelve el nombre <code>api-svc</code> automáticamente al ClusterIP del Service. Eso es el <strong>service discovery</strong> interno de Kubernetes.</p>
+          </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Ver los logs — confirmar el flujo nginx → API</span></div>
+          <pre><span class="c"># Logs de la API (verás las peticiones que llegan desde nginx)</span>
+kubectl logs -l app=api --tail=20
+
+<span class="c"># Logs del frontend — nginx registra cada proxy hacia la API</span>
+kubectl logs -l app=frontend --tail=20
+<span class="c"># 10.x.x.x - "GET /api/hello HTTP/1.0" 200</span>
+<span class="c"># 10.x.x.x - "GET /api/products HTTP/1.0" 200</span></pre>
+          <div class="theory-body" style="margin-top:10px;">
+            <p>La IP que aparece en los logs del frontend es la IP interna del Pod — confirma que es tráfico Pod-a-Pod, no desde el exterior.</p>
+          </div>
+        </div>
+
+        <!-- Step 7 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 7</span><span class="theory-title">Limpiar</span></div>
+          <pre>kubectl delete -f k8s/frontend-deployment.yaml
+kubectl delete -f k8s/api-deployment.yaml
+
+kubectl get pods      <span class="c"># sin pods</span>
+kubectl get services  <span class="c"># solo "kubernetes"</span></pre>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Construir las dos imágenes Docker locales</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Desplegar API (ClusterIP) y Frontend (NodePort) en K8s</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Verificar que los 4 pods están en Running</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Abrir <code>localhost:30080</code> y ver el hostname del Pod de la API cambiar al recargar</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Comprobar que la API no es accesible desde el browser (sin NodePort)</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la diferencia entre ClusterIP y NodePort</span><span class="ttag tt-theory">teoría</span></li>
+        </ul>
+
+          </div>
+        </div>
+      </div>
+
       <!-- ─── 2.3 LAB 2-A ─── -->
       <div class="module">
         <div class="mod-header">
