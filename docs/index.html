@@ -4841,11 +4841,191 @@ kubectl get secrets <span class="c"># db-secret eliminado</span></pre>
         </div>
       </div>
 
-      <!-- ─── LAB 2-7 FULLSTACK ─── -->
+      <!-- ─── LAB 2-7 ROLLOUT UNDO ─── -->
+      <div class="module">
+        <div class="mod-header">
+          <span class="mod-icon">🔁</span>
+          <span class="mod-title">Lab 2-7 — Rollout y Undo: actualiza la imagen sin downtime</span>
+          <span class="mod-duration">Semana 3 — Lab completo</span>
+        </div>
+
+        <div class="lab-overview">
+          <div class="lab-overview-box lov-what">
+            <h4>¿Qué haremos?</h4>
+            <p>Haremos un <strong>rolling update real</strong> cambiando la imagen del contenedor — de v1 (sin logs) a v2 (con <code>log.info</code> en todos los endpoints). Veremos los logs en tiempo real con <code>kubectl logs -f</code> y luego usaremos <code>kubectl rollout undo</code> para revertir a v1. Esta vez el undo <strong>sí funciona</strong> porque el cambio está en la imagen del Deployment, no en un ConfigMap externo.</p>
+          </div>
+          <div class="lab-overview-box lov-goals">
+            <h4>Objetivos de aprendizaje</h4>
+            <ul>
+              <li>Entender por qué <code>rollout undo</code> funciona con imágenes pero no con ConfigMaps</li>
+              <li>Usar <code>kubectl set image</code> para actualizar sin editar el YAML</li>
+              <li>Monitorear logs en tiempo real con <code>kubectl logs -f --prefix</code></li>
+              <li>Ver el historial de revisiones con <code>kubectl rollout history</code></li>
+              <li>Revertir a la versión anterior con <code>kubectl rollout undo</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Teoría: por qué ahora sí funciona -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">rollout undo con imagen vs ConfigMap — la diferencia clave</span></div>
+          <div class="theory-body">
+            <p>El historial de revisiones de un Deployment guarda <strong>snapshots del Pod template</strong> — imagen, variables de entorno, recursos. Cuando cambias la imagen, eso queda en el historial y <code>rollout undo</code> puede restaurarlo.</p>
+            <p style="margin-top:8px;">Un ConfigMap es un objeto completamente separado — el Deployment solo guarda su <em>nombre</em>, no su contenido. Por eso en Lab 2-5 el undo no podía revertir lo que no había registrado.</p>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
+            <div style="background:#fff1f2;border:1.5px solid #fca5a5;border-radius:10px;padding:16px;">
+              <div style="font-weight:700;color:#991b1b;margin-bottom:8px;">Lab 2-5 — ConfigMap ✗</div>
+              <div style="font-size:.88rem;color:#7f1d1d;line-height:1.7;">Deployment guarda: <code>configmap: nginx-html</code><br>Solo el nombre — el contenido vive afuera.<br><code>rollout undo</code> revierte el Deployment<br>pero el ConfigMap no cambia.</div>
+            </div>
+            <div style="background:#f0fdf4;border:1.5px solid #4ade80;border-radius:10px;padding:16px;">
+              <div style="font-weight:700;color:#166534;margin-bottom:8px;">Lab 2-7 — Imagen ✓</div>
+              <div style="font-size:.88rem;color:#14532d;line-height:1.7;">Deployment guarda: <code>image: lab2-7-api:v2</code><br>La imagen ES parte del Pod template.<br><code>rollout undo</code> restaura la imagen anterior<br>y los Pods arrancan con el código viejo.</div>
+            </div>
+          </div>
+          <pre style="font-size:.82rem;line-height:1.7;"><span class="c"># Historial del Deployment — guarda el Pod template completo</span>
+kubectl rollout history deployment/products-api
+<span class="c"># REVISION   imagen en el Pod template</span>
+<span class="c"># 1          lab2-6-products-api:1.0  ← v1 sin logs</span>
+<span class="c"># 2          lab2-7-products-api:v2   ← v2 con logs</span>
+
+kubectl rollout undo deployment/products-api
+<span class="c"># K8s recrea los Pods con la imagen de la revisión 1</span>
+<span class="c"># REVISION</span>
+<span class="c"># 2          lab2-7-products-api:v2</span>
+<span class="c"># 3          lab2-6-products-api:1.0  ← undo aplicado (revisión nueva con imagen vieja)</span></pre>
+        </div>
+
+        <div class="lab-block">
+          <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-7 — Rolling update de imagen + rollout undo verificado</span></div>
+          <div class="lab-content">
+
+        <!-- Step 1 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Aplicar Secret y desplegar v1 (sin logs)</span></div>
+          <div class="theory-body"><p>Si el Lab 2-6 aún está corriendo, límpialo primero:</p></div>
+          <pre>kubectl delete deployment products-api --ignore-not-found
+kubectl delete service products-api-svc --ignore-not-found
+kubectl delete secret db-secret --ignore-not-found
+
+<span class="c"># Desplegar v1 — imagen del Lab 2-6 (sin logs)</span>
+cd section02-kubernetes-intro/lab-2-7-rollout-undo
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/api-deployment.yaml
+<span class="c"># deployment.apps/products-api created  ← imagen lab2-6-products-api:1.0</span>
+<span class="c"># service/products-api-svc created</span>
+
+kubectl get pods -l app=products-api
+<span class="c"># NAME                            READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># products-api-xxxx-aaaaa         1/1     Running   0          30s  (x3)</span></pre>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Construir la imagen v2 (con logs)</span></div>
+          <div class="theory-body"><p>El código en <code>api/</code> es idéntico al Lab 2-6 salvo que <code>ProductController</code> ahora tiene <code>@Slf4j</code> y <code>log.info</code> en cada endpoint.</p></div>
+          <pre>docker build -t lab2-7-products-api:v2 ./api
+<span class="c"># (usa el caché Maven del Lab 2-6 — tarda mucho menos)</span>
+
+docker images | grep lab2-7
+<span class="c"># lab2-7-products-api   v2   ...</span></pre>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Confirmar que v1 no tiene logs</span></div>
+          <div class="theory-body"><p>Abre <strong>dos terminales</strong>. En la primera sigue los logs:</p></div>
+          <pre><span class="c"># Terminal 1 — seguir logs en tiempo real</span>
+kubectl logs -l app=products-api -f</pre>
+          <div class="theory-body" style="margin-top:8px;"><p>En la segunda terminal llama al endpoint:</p></div>
+          <pre><span class="c"># Terminal 2 — llamar a la API</span>
+curl http://localhost:30092/api/products</pre>
+          <div class="theory-body" style="margin-top:8px;"><p>En la Terminal 1 <strong>no aparece nada</strong> — v1 no tiene logging. Queda confirmado que estás en v1.</p></div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Rolling update a v2</span></div>
+          <pre><span class="c"># Actualizar la imagen — K8s reemplaza los Pods de uno en uno</span>
+kubectl set image deployment/products-api api=lab2-7-products-api:v2
+
+<span class="c"># Seguir el rolling update en tiempo real</span>
+kubectl rollout status deployment/products-api
+<span class="c"># Waiting for deployment "products-api" rollout to finish: 1 out of 3 new replicas...</span>
+<span class="c"># Waiting for deployment "products-api" rollout to finish: 2 out of 3 new replicas...</span>
+<span class="c"># deployment "products-api" successfully rolled out</span>
+
+<span class="c"># Ver el historial — ahora hay 2 revisiones</span>
+kubectl rollout history deployment/products-api
+<span class="c"># REVISION  CHANGE-CAUSE</span>
+<span class="c"># 1         &lt;none&gt;   ← lab2-6-products-api:1.0 (v1)</span>
+<span class="c"># 2         &lt;none&gt;   ← lab2-7-products-api:v2</span></pre>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 5</span><span class="theory-title">Verificar los logs en v2</span></div>
+          <div class="theory-body"><p>Sigue los logs con <code>--prefix</code> para ver qué Pod responde cada request:</p></div>
+          <pre><span class="c"># Terminal 1</span>
+kubectl logs -l app=products-api -f --prefix</pre>
+          <div class="theory-body" style="margin-top:8px;"><p>En Terminal 2 ejecuta varios requests:</p></div>
+          <pre><span class="c"># Terminal 2</span>
+curl http://localhost:30092/api/products
+curl http://localhost:30092/api/products/1
+curl -X POST http://localhost:30092/api/products \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Auriculares","price":59.99,"stock":5,"description":"Bluetooth 5.0"}'</pre>
+          <div class="theory-body" style="margin-top:8px;"><p>Los logs aparecen en tiempo real en Terminal 1:</p></div>
+          <pre><span class="c"># [products-api-yyyy-aaaaa] INFO [GET]  /api/products - search=null</span>
+<span class="c"># [products-api-yyyy-aaaaa] INFO [GET]  /api/products - 3 productos encontrados</span>
+<span class="c"># [products-api-yyyy-bbbbb] INFO [GET]  /api/products/1 - encontrado: Teclado Mecánico</span>
+<span class="c"># [products-api-yyyy-ccccc] INFO [POST] /api/products - creando: name=Auriculares, price=59.99</span></pre>
+          <div class="theory-body" style="margin-top:8px;"><p>Fíjate en el prefix — K8s balancea automáticamente entre los 3 pods.</p></div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Rollout undo — revertir a v1</span></div>
+          <pre><span class="c"># Revertir a la imagen anterior</span>
+kubectl rollout undo deployment/products-api
+
+kubectl rollout status deployment/products-api
+<span class="c"># deployment "products-api" successfully rolled out</span>
+
+kubectl rollout history deployment/products-api
+<span class="c"># REVISION  CHANGE-CAUSE</span>
+<span class="c"># 2         &lt;none&gt;</span>
+<span class="c"># 3         &lt;none&gt;   ← undo aplicado (imagen lab2-6-products-api:1.0 de vuelta)</span></pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <p>Repite el <code>curl</code> desde Terminal 2 y mira Terminal 1 — <strong>los logs desaparecieron</strong>. Los Pods volvieron a la imagen v1 sin logging. <code>rollout undo</code> funcionó porque el cambio estaba dentro del Deployment.</p>
+          </div>
+        </div>
+
+        <!-- Step 7 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 7</span><span class="theory-title">Limpiar</span></div>
+          <pre>kubectl delete -f k8s/api-deployment.yaml
+kubectl delete -f k8s/secret.yaml</pre>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Desplegar v1 y confirmar que los logs están vacíos al llamar al endpoint</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Construir la imagen v2 con logging</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ejecutar el rolling update con <code>kubectl set image</code> y seguirlo con <code>rollout status</code></span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ver los logs en tiempo real con <code>kubectl logs -f --prefix</code> mientras haces requests</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ejecutar <code>kubectl rollout undo</code> y comprobar que los logs desaparecen</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la diferencia entre revertir una imagen vs revertir un ConfigMap</span><span class="ttag tt-theory">teoría</span></li>
+        </ul>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── LAB 2-8 FULLSTACK ─── -->
       <div class="module">
         <div class="mod-header">
           <span class="mod-icon">🔗</span>
-          <span class="mod-title">Lab 2-7 — Fullstack en Kubernetes: Frontend + API con Services</span>
+          <span class="mod-title">Lab 2-8 — Fullstack en Kubernetes: Frontend + API con Services</span>
           <span class="mod-duration">Semana 3 — Lab completo</span>
         </div>
 
@@ -4903,7 +5083,7 @@ kubectl get secrets <span class="c"># db-secret eliminado</span></pre>
         </div>
 
         <div class="lab-block">
-          <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-7 — React + Node.js API fullstack en K8s</span></div>
+          <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-8 — React + Node.js API fullstack en K8s</span></div>
           <div class="lab-content">
 
         <!-- Step 1 -->
@@ -4913,7 +5093,7 @@ kubectl get secrets <span class="c"># db-secret eliminado</span></pre>
             <p>Las imágenes se construyen localmente. Docker Desktop comparte el daemon de Docker con K8s, así que con <code>imagePullPolicy: Never</code> K8s las usa directamente sin buscarlas en Docker Hub.</p>
           </div>
           <pre><span class="c"># Desde la carpeta del lab</span>
-cd section02-kubernetes-intro/lab-2-7-fullstack
+cd section02-kubernetes-intro/lab-2-8-fullstack
 
 <span class="c"># Imagen de la API (Node.js Express)</span>
 docker build -t lab2-6-api:1.0 ./api
