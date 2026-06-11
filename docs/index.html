@@ -4566,6 +4566,9 @@ kubectl delete -f nginx-configmap.yaml</pre>
         └── products-api-svc  NodePort 30092
               curl http://localhost:30092/api/products</pre>
           <div class="theory-body" style="margin-top:8px;">
+            <div style="background:#fefce8;border:1.5px solid #facc15;border-radius:10px;padding:14px 18px;margin-bottom:12px;color:#713f12;">
+              <strong>📌 ¿Y en producción en la nube?</strong> En AWS, GCP o Azure la base de datos tiene su propio DNS — por ejemplo RDS te da un endpoint como <code>mydb.c9akciq32.us-east-1.rds.amazonaws.com</code>. Ese hostname va en un <strong>ConfigMap</strong> (no es sensible) y las credenciales en el <strong>Secret</strong>. La regla es simple: ¿es sensible? → Secret. ¿Es configuración? → ConfigMap. Nuestro lab usa <code>host.docker.internal</code> en lugar del DNS de RDS — la estructura del manifiesto es idéntica.
+            </div>
             <p><strong>¿Por qué <code>host.docker.internal</code>?</strong> Los Pods de K8s en Docker Desktop corren dentro de una VM Linux. Para llegar a un proceso en tu Mac usan este nombre DNS especial que Docker Desktop resuelve automáticamente.</p>
           </div>
         </div>
