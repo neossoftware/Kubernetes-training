@@ -48,10 +48,10 @@ kubectl get svc
 # NAME           TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
 # mi-nginx-svc   NodePort    10.96.58.12     <none>        80:30090/TCP   8s
 
-# Verificar que el Service apunta al Pod (IP del endpoint debe aparecer)
-kubectl get endpoints mi-nginx-svc
-# NAME           ENDPOINTS        AGE
-# mi-nginx-svc   10.1.0.45:80     8s
+# Verificar que el Service apunta al Pod (K8s v1.33+)
+kubectl get endpointslices -l kubernetes.io/service-name=mi-nginx-svc
+# NAME                 ADDRESSTYPE   PORTS   ENDPOINTS      AGE
+# mi-nginx-svc-xxxxx   IPv4          80      10.1.0.45      8s
 ```
 
 ---

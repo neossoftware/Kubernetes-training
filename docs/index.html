@@ -3431,10 +3431,10 @@ kubectl get svc
 <span class="c"># kubernetes     ClusterIP   10.96.0.1       &lt;none&gt;        443/TCP        2d</span>
 <span class="c"># mi-nginx-svc   NodePort    10.96.58.12     &lt;none&gt;        80:30090/TCP   8s</span>
 
-<span class="c"># Ver que el Service apunta al Pod correcto</span>
-kubectl get endpoints mi-nginx-svc
-<span class="c"># NAME           ENDPOINTS        AGE</span>
-<span class="c"># mi-nginx-svc   10.1.0.45:80     8s   ← IP del Pod</span></pre>
+<span class="c"># Ver que el Service apunta al Pod correcto (K8s v1.33+ usa EndpointSlice)</span>
+kubectl get endpointslices -l kubernetes.io/service-name=mi-nginx-svc
+<span class="c"># NAME                 ADDRESSTYPE   PORTS   ENDPOINTS    AGE</span>
+<span class="c"># mi-nginx-svc-xxxxx   IPv4          80      10.1.0.45    8s</span></pre>
         </div>
 
         <!-- Step 3 -->
