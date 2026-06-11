@@ -7,8 +7,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-    ports:
-      - "3000:3000"
+    # Sin ports: la API no se expone fuera de la red Docker
+    # nginx (frontend) la alcanza por nombre de servicio: http://api:3000
     networks:
       - lab1-net
     restart: unless-stopped

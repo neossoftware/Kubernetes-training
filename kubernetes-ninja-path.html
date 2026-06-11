@@ -1291,7 +1291,9 @@ npm install axios</pre>
                 <pre>import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// VITE_API_URL='' (vacío) → same-origin, nginx hace el proxy hacia la API
+// ?? en vez de || para que string vacío no caiga al fallback localhost:3000
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 function ProductCard({ product, onDelete }) {
   return (
@@ -1433,16 +1435,15 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-<span class="c"># La API_URL será inyectada en build time o via nginx</span>
-ARG VITE_API_URL=http://localhost:3000
+<span class="c"># VITE_API_URL vacío = same-origin: el browser llama a /api/... sin host</span>
+<span class="c"># nginx hace proxy_pass a "api:3000" (Docker) o "api-svc:3000" (K8s)</span>
+ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 <span class="c"># Stage 2: Servir con nginx</span>
 FROM nginx:1.25-alpine
-<span class="c"># Copiar build</span>
 COPY --from=build /app/dist /usr/share/nginx/html
-<span class="c"># Configuración nginx para SPA (React Router)</span>
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]</pre>
@@ -1454,9 +1455,17 @@ CMD ["nginx", "-g", "daemon off;"]</pre>
     root /usr/share/nginx/html;
     index index.html;
 
-    <span class="c"># Gzip</span>
     gzip on;
     gzip_types text/plain application/javascript text/css application/json;
+
+    <span class="c"># Proxy hacia la API — el browser llama a /api/... (mismo origen)</span>
+    <span class="c"># Docker Compose: "api" es el nombre del servicio en docker-compose.yml</span>
+    <span class="c"># En Kubernetes se cambia a "api-svc" (nombre del Service ClusterIP)</span>
+    location /api/ {
+        proxy_pass       http://api:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 
     <span class="c"># SPA routing — todas las rutas van a index.html</span>
     location / {
@@ -1488,8 +1497,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-    ports:
-      - "3000:3000"
+    <span class="c"># Sin ports: la API no se expone fuera de la red Docker</span>
+    <span class="c"># nginx (frontend) la alcanza por nombre de servicio: http://api:3000</span>
     networks:
       - lab1-net
     restart: unless-stopped
@@ -1505,7 +1514,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:3000
+        VITE_API_URL: ""   <span class="c"># same-origin — nginx proxy_pass a api:3000</span>
     container_name: lab1-frontend
     ports:
       - "80:80"
