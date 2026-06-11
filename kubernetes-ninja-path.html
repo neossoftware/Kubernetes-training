@@ -4517,6 +4517,25 @@ kubectl delete -f nginx-configmap.yaml</pre>
           <span class="mod-duration">Semana 3 — Lab completo</span>
         </div>
 
+        <!-- Objetivos del lab -->
+        <div class="lab-overview" style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:20px 24px;margin-bottom:20px;">
+          <div style="font-weight:700;font-size:1rem;color:#1e293b;margin-bottom:12px;">🎯 ¿Qué vas a aprender en este lab?</div>
+          <ul style="margin:0 0 0 18px;line-height:2;color:#334155;">
+            <li>Qué es un <strong>Kubernetes Secret</strong> y por qué usarlo en lugar de hardcodear credenciales</li>
+            <li>Cómo los valores del Secret llegan como <strong>variables de entorno</strong> al contenedor</li>
+            <li>Cómo <strong>Spring Boot</strong> lee esas variables desde <code>application.properties</code> con <code>${VAR}</code></li>
+            <li>Por qué la BD (<strong>PostgreSQL</strong>) vive fuera del clúster — simulando una VM o RDS en producción</li>
+            <li>Cómo los Pods de K8s se conectan a un servicio externo usando <code>host.docker.internal</code></li>
+          </ul>
+          <div style="margin-top:14px;font-weight:700;font-size:1rem;color:#1e293b;margin-bottom:10px;">🛠 ¿Qué vas a construir?</div>
+          <ul style="margin:0 0 0 18px;line-height:2;color:#334155;">
+            <li>Un <strong>Secret</strong> con las credenciales de la BD (usuario, password, nombre de BD)</li>
+            <li>Un <strong>Deployment de 3 réplicas</strong> de la Spring Boot Products API que lee ese Secret</li>
+            <li>Un <strong>Service NodePort</strong> en el puerto <code>30092</code> para probar la API con <code>curl</code></li>
+            <li>La conexión real a <strong>PostgreSQL en Docker</strong> (fuera del clúster K8s)</li>
+          </ul>
+        </div>
+
         <!-- Teoría: Secrets -->
         <div class="theory-block">
           <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Qué es un Kubernetes Secret?</span></div>
