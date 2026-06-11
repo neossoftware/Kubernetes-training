@@ -4641,6 +4641,42 @@ docker images | grep lab2-6-products-api
 <span class="c"># lab2-6-products-api   1.0   ...</span></pre>
         </div>
 
+        <!-- Teoría: cómo Spring lee el Secret -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Cómo llegan los valores del Secret a Spring Boot?</span></div>
+          <div class="theory-body">
+            <p>El camino tiene tres pasos. K8s inyecta los valores del Secret como <strong>variables de entorno</strong> en el contenedor. Spring Boot las lee desde <code>application.properties</code> con la sintaxis <code>${NOMBRE_VAR}</code>. La app nunca toca el Secret directamente — solo ve variables de entorno normales.</p>
+          </div>
+          <pre style="font-size:.82rem;line-height:1.8;"><span class="c"># 1. Secret YAML — valores en base64</span>
+data:
+  DB_USER:     YWRtaW4=      <span class="c"># "admin"</span>
+  DB_PASSWORD: bmluamExMjM=  <span class="c"># "ninja123"</span>
+  DB_NAME:     bGFiZGI=      <span class="c"># "labdb"</span>
+
+         │  kubectl apply -f secret.yaml
+         ▼
+
+<span class="c"># 2. K8s decodifica base64 e inyecta como variables de entorno en el Pod</span>
+env:
+  - name: DB_USER
+    valueFrom:
+      secretKeyRef:
+        name: db-secret
+        key: DB_USER        <span class="c"># → DB_USER=admin  (texto plano dentro del contenedor)</span>
+
+         │  el contenedor arranca con esas vars en su entorno
+         ▼
+
+<span class="c"># 3. Spring Boot lee las vars con ${} en application.properties</span>
+spring.datasource.username=${DB_USER}      <span class="c"># lee la var de entorno DB_USER</span>
+spring.datasource.password=${DB_PASSWORD}  <span class="c"># lee la var de entorno DB_PASSWORD</span>
+spring.datasource.url=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}</pre>
+          <div class="theory-body" style="margin-top:10px;">
+            <p>Spring no sabe ni le importa si el valor viene de un Secret, un ConfigMap, o una variable definida a mano. Solo busca <code>DB_USER</code> en el entorno del proceso. Esto es lo que hace el patrón portable: el mismo <code>application.properties</code> funciona en Docker Compose (donde las vars vienen del <code>environment:</code>) y en K8s (donde vienen del Secret).</p>
+            <p style="margin-top:8px;"><strong>¿Por qué sin defaults?</strong> En el Lab 1-B el código tenía <code>${DB_USER:admin}</code> — si la variable no existía, Spring usaba <code>admin</code> sin avisar. En K8s eliminamos el default para que un Secret mal configurado cause <strong>CrashLoopBackOff</strong> en lugar de un fallo silencioso con credenciales incorrectas.</p>
+          </div>
+        </div>
+
         <!-- Step 3 -->
         <div class="theory-block">
           <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Crear el Secret con las credenciales de la BD</span></div>
