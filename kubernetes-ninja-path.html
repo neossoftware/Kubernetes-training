@@ -4743,6 +4743,27 @@ kubectl get pods -l app=products-api
 kubectl logs -l app=products-api --tail=5
 <span class="c"># HikariPool-1 - Start completed.</span>
 <span class="c"># Tomcat started on port 8080</span></pre>
+          <div style="background:#eff6ff;border:1.5px solid #60a5fa;border-radius:10px;padding:16px 18px;margin-top:12px;color:#1e3a5f;">
+            <strong>📋 Comandos de logs — referencia rápida</strong>
+            <pre style="background:#dbeafe;border:none;margin:10px 0 0;padding:10px 14px;border-radius:6px;color:#1e3a5f;font-size:.82rem;line-height:1.9;"><span style="color:#1d4ed8;"># Últimas N líneas (por defecto muestra pocas)</span>
+kubectl logs -l app=products-api --tail=50
+
+<span style="color:#1d4ed8;"># Todos los logs sin límite</span>
+kubectl logs -l app=products-api --tail=-1
+
+<span style="color:#1d4ed8;"># Ver de qué pod viene cada línea (útil con varias réplicas)</span>
+kubectl logs -l app=products-api --tail=-1 --prefix
+
+<span style="color:#1d4ed8;"># Seguir logs en tiempo real (como docker logs -f)</span>
+kubectl logs -l app=products-api -f
+
+<span style="color:#1d4ed8;"># Logs de un pod específico</span>
+kubectl logs products-api-xxxx-aaaaa
+
+<span style="color:#1d4ed8;"># Logs del contenedor ANTERIOR — imprescindible en CrashLoopBackOff</span>
+<span style="color:#1d4ed8;"># Muestra lo que pasó justo antes del crash</span>
+kubectl logs products-api-xxxx-aaaaa --previous</pre>
+          </div>
           <div style="background:#fef9c3;border:1.5px solid #facc15;border-radius:10px;padding:14px 18px;margin-top:12px;color:#713f12;">
             <strong>⚠️ CrashLoopBackOff — ¿qué hacer si los pods fallan?</strong><br><br>
             Si los pods arrancaron <strong>antes de que la BD estuviera lista</strong>, Spring Boot no puede conectar y el pod muere. K8s lo intenta reiniciar varias veces hasta dejarlo en <code>CrashLoopBackOff</code>:
