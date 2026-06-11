@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-html
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8"><title>Lab 2-5</title>
+      <style>
+        body { font-family:sans-serif; display:flex; align-items:center;
+               justify-content:center; min-height:100vh; margin:0;
+               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card { background:white; padding:40px 60px; border-radius:16px;
+                text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+        h1 { color:#1e293b; font-size:2.2rem; margin:0 0 10px; }
+        p  { color:#64748b; margin:0; }
+        .badge { background:#3b82f6; color:white; padding:4px 14px;
+                 border-radius:20px; font-size:.85rem; margin-top:14px;
+                 display:inline-block; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>☸ Deployment + ConfigMap</h1>
+        <p>3 réplicas sirviendo esta página.</p>
+        <div class="badge">v1 · Lab 2-5</div>
+      </div>
+    </body>
+    </html>

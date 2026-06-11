@@ -4256,6 +4256,239 @@ kubectl get deployments</pre>
         </ul>
       </div>
 
+      <!-- ─── 2.5 Lab: Deployment + ConfigMap + Rolling Update ─── -->
+      <div class="module">
+        <div class="mod-header">
+          <span class="mod-icon">🔄</span>
+          <span class="mod-title">Lab 2-5 — Actualiza tu app sin downtime: Deployment + ConfigMap</span>
+          <span class="mod-duration">Semana 5 — Lab</span>
+        </div>
+
+        <div class="lab-overview">
+          <div class="lab-overview-box lov-what">
+            <h4>¿Qué haremos?</h4>
+            <p>Combinaremos el <strong>Deployment de 3 réplicas</strong> del Lab 2-4 con un <strong>ConfigMap</strong> del Lab 2-3. Modificaremos la página HTML y usaremos <code>kubectl rollout restart</code> para actualizar los 3 Pods <strong>sin que la app deje de responder</strong>.</p>
+          </div>
+          <div class="lab-overview-box lov-goals">
+            <h4>Objetivos de aprendizaje</h4>
+            <ul>
+              <li>Combinar Deployment + ConfigMap (volumeMount)</li>
+              <li>Entender <strong>Rolling Update</strong>: K8s reemplaza Pods de uno en uno</li>
+              <li>Usar <code>kubectl rollout restart</code> y <code>kubectl rollout status</code></li>
+              <li>Ver la diferencia con Lab 2-3 (Pod directo): aquí no hay downtime</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Teoría: Rolling Update -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Rolling Update: actualizar sin downtime</span></div>
+          <div class="theory-body">
+            <p>Cuando haces <code>kubectl rollout restart</code>, K8s no mata todos los Pods a la vez. Los reemplaza <strong>de uno en uno</strong> — mientras el Pod nuevo arranca, los otros siguen atendiendo tráfico.</p>
+
+            <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin:10px 0;font-family:var(--mono);font-size:11.5px;line-height:2;">
+              <div style="font-family:var(--sans);font-size:11px;font-weight:700;color:#64748b;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">Rolling Update — 3 réplicas</div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <span style="font-family:var(--sans);font-size:10px;color:#94a3b8;width:60px;">Inicio</span>
+                  <span style="background:#bbf7d0;border:1.5px solid #6ee7b7;border-radius:4px;padding:2px 8px;color:#166534;font-size:10.5px;">Pod v1</span>
+                  <span style="background:#bbf7d0;border:1.5px solid #6ee7b7;border-radius:4px;padding:2px 8px;color:#166534;font-size:10.5px;">Pod v1</span>
+                  <span style="background:#bbf7d0;border:1.5px solid #6ee7b7;border-radius:4px;padding:2px 8px;color:#166534;font-size:10.5px;">Pod v1</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <span style="font-family:var(--sans);font-size:10px;color:#94a3b8;width:60px;">Paso 1</span>
+                  <span style="background:#fef9c3;border:1.5px solid #fde047;border-radius:4px;padding:2px 8px;color:#854d0e;font-size:10.5px;">Pod v2 ✨</span>
+                  <span style="background:#bbf7d0;border:1.5px solid #6ee7b7;border-radius:4px;padding:2px 8px;color:#166534;font-size:10.5px;">Pod v1</span>
+                  <span style="background:#bbf7d0;border:1.5px solid #6ee7b7;border-radius:4px;padding:2px 8px;color:#166534;font-size:10.5px;">Pod v1</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <span style="font-family:var(--sans);font-size:10px;color:#94a3b8;width:60px;">Paso 2</span>
+                  <span style="background:#fef9c3;border:1.5px solid #fde047;border-radius:4px;padding:2px 8px;color:#854d0e;font-size:10.5px;">Pod v2 ✨</span>
+                  <span style="background:#fef9c3;border:1.5px solid #fde047;border-radius:4px;padding:2px 8px;color:#854d0e;font-size:10.5px;">Pod v2 ✨</span>
+                  <span style="background:#bbf7d0;border:1.5px solid #6ee7b7;border-radius:4px;padding:2px 8px;color:#166534;font-size:10.5px;">Pod v1</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <span style="font-family:var(--sans);font-size:10px;color:#94a3b8;width:60px;">Final</span>
+                  <span style="background:#fef9c3;border:1.5px solid #fde047;border-radius:4px;padding:2px 8px;color:#854d0e;font-size:10.5px;">Pod v2 ✨</span>
+                  <span style="background:#fef9c3;border:1.5px solid #fde047;border-radius:4px;padding:2px 8px;color:#854d0e;font-size:10.5px;">Pod v2 ✨</span>
+                  <span style="background:#fef9c3;border:1.5px solid #fde047;border-radius:4px;padding:2px 8px;color:#854d0e;font-size:10.5px;">Pod v2 ✨</span>
+                </div>
+              </div>
+              <div style="font-family:var(--sans);font-size:10.5px;color:#64748b;margin-top:8px;">En todo momento hay al menos 2 Pods atendiendo tráfico. El usuario no nota nada.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Crear el ConfigMap con la página HTML</span></div>
+          <div class="filename">nginx-configmap.yaml</div>
+          <pre><span class="k">apiVersion:</span> v1
+<span class="k">kind:</span> ConfigMap
+<span class="k">metadata:</span>
+  <span class="k">name:</span> nginx-html
+<span class="k">data:</span>
+  <span class="k">index.html:</span> |
+    &lt;!DOCTYPE html&gt;
+    &lt;html&gt;
+    &lt;head&gt;
+      &lt;meta charset="utf-8"&gt;&lt;title&gt;Lab 2-5&lt;/title&gt;
+      &lt;style&gt;
+        body { font-family:sans-serif; display:flex; align-items:center;
+               justify-content:center; min-height:100vh; margin:0;
+               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card { background:white; padding:40px 60px; border-radius:16px;
+                text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+        h1 { color:#1e293b; font-size:2.2rem; margin:0 0 10px; }
+        p  { color:#64748b; margin:0; }
+        .badge { background:#3b82f6; color:white; padding:4px 14px;
+                 border-radius:20px; font-size:.85rem; margin-top:14px;
+                 display:inline-block; }
+      &lt;/style&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+      &lt;div class="card"&gt;
+        &lt;h1&gt;&#9096; Deployment + ConfigMap&lt;/h1&gt;
+        &lt;p&gt;3 réplicas sirviendo esta página.&lt;/p&gt;
+        &lt;div class="badge"&gt;v1 · Lab 2-5&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/body&gt;
+    &lt;/html&gt;</pre>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Crear el Deployment con el ConfigMap montado</span></div>
+          <div class="filename">nginx-deployment-v2.yaml</div>
+          <pre><span class="k">apiVersion:</span> apps/v1
+<span class="k">kind:</span> Deployment
+<span class="k">metadata:</span>
+  <span class="k">name:</span> nginx-deploy
+<span class="k">spec:</span>
+  <span class="k">replicas:</span> <span class="n">3</span>
+  <span class="k">selector:</span>
+    <span class="k">matchLabels:</span>
+      <span class="k">app:</span> nginx-deploy
+  <span class="k">template:</span>
+    <span class="k">metadata:</span>
+      <span class="k">labels:</span>
+        <span class="k">app:</span> nginx-deploy
+    <span class="k">spec:</span>
+      <span class="k">containers:</span>
+        - <span class="k">name:</span> nginx
+          <span class="k">image:</span> nginx:1.27-alpine
+          <span class="k">ports:</span>
+            - <span class="k">containerPort:</span> 80
+          <span class="k">volumeMounts:</span>
+            - <span class="k">name:</span> html-vol
+              <span class="k">mountPath:</span> /usr/share/nginx/html
+      <span class="k">volumes:</span>
+        - <span class="k">name:</span> html-vol
+          <span class="k">configMap:</span>
+            <span class="k">name:</span> nginx-html    <span class="c"># apunta al ConfigMap del Step 1</span>
+---
+<span class="k">apiVersion:</span> v1
+<span class="k">kind:</span> Service
+<span class="k">metadata:</span>
+  <span class="k">name:</span> nginx-deploy-svc
+<span class="k">spec:</span>
+  <span class="k">selector:</span>
+    <span class="k">app:</span> nginx-deploy
+  <span class="k">type:</span> NodePort
+  <span class="k">ports:</span>
+    - <span class="k">port:</span> 80
+      <span class="k">targetPort:</span> 80
+      <span class="k">nodePort:</span> 30091</pre>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Aplicar y verificar la v1</span></div>
+          <pre><span class="c"># Aplica primero el ConfigMap, luego el Deployment</span>
+kubectl apply -f nginx-configmap.yaml
+kubectl apply -f nginx-deployment-v2.yaml
+
+<span class="c"># Verificar 3 pods Running</span>
+kubectl get pods
+kubectl get deployments
+
+<span class="c"># Abrir en el navegador y ver la v1 (fondo azul-morado)</span>
+<span class="c"># Docker Desktop: http://localhost:30091</span></pre>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Modificar el ConfigMap — versión 2</span></div>
+          <div class="theory-body">
+            <p>Edita <code>nginx-configmap.yaml</code> y cambia el texto y el color:</p>
+          </div>
+          <pre><span class="c"># Cambios en nginx-configmap.yaml:</span>
+background: <span class="s">linear-gradient(135deg, #f59e0b 0%, #dc2626 100%)</span>;  <span class="c">← naranja-rojo</span>
+&lt;h1&gt;&#9096; <span class="s">¡Actualización sin downtime!</span>&lt;/h1&gt;
+&lt;div class="badge"&gt;<span class="s">v2 · Lab 2-5&lt;/div&gt;</span>
+
+<span class="c"># Aplicar el ConfigMap actualizado</span>
+kubectl apply -f nginx-configmap.yaml
+<span class="c"># configmap/nginx-html configured</span></pre>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 5</span><span class="theory-title">Rolling Update con rollout restart</span></div>
+          <div class="theory-body">
+            <p>Con un <strong>Deployment</strong> no necesitas borrar Pods manualmente como en Lab 2-3. Un solo comando hace el rolling update:</p>
+          </div>
+          <pre><span class="c"># Reinicia el Deployment — K8s reemplaza los Pods de uno en uno</span>
+kubectl rollout restart deployment/nginx-deploy
+
+<span class="c"># Seguir el progreso del rolling update en tiempo real</span>
+kubectl rollout status deployment/nginx-deploy
+<span class="c"># Waiting for deployment "nginx-deploy" rollout to finish: 1 out of 3 new replicas...</span>
+<span class="c"># Waiting for deployment "nginx-deploy" rollout to finish: 2 out of 3 new replicas...</span>
+<span class="c"># deployment "nginx-deploy" successfully rolled out</span>
+
+<span class="c"># Ver los pods nuevos (nuevo hash en el nombre)</span>
+kubectl get pods</pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <p>Recarga <strong>http://localhost:30091</strong> — verás la v2 con fondo naranja-rojo y el badge "v2 · Lab 2-5". En ningún momento la app dejó de responder.</p>
+            <div class="step-ok">Este es el flujo de producción real: actualizar ConfigMap → rollout restart → rolling update sin downtime. Con el Pod directo del Lab 2-3 necesitabas delete + apply manualmente y había un momento sin servicio.</div>
+          </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Ver el historial y hacer rollback</span></div>
+          <pre><span class="c"># Ver historial de versiones del Deployment</span>
+kubectl rollout history deployment/nginx-deploy
+<span class="c"># REVISION  CHANGE-CAUSE</span>
+<span class="c"># 1         &lt;none&gt;</span>
+<span class="c"># 2         &lt;none&gt;</span>
+
+<span class="c"># Volver a la versión anterior si algo salió mal</span>
+kubectl rollout undo deployment/nginx-deploy
+<span class="c"># deployment.apps/nginx-deploy rolled back</span>
+
+<span class="c"># Verificar que volvió a la v1 (fondo azul-morado)</span>
+kubectl rollout status deployment/nginx-deploy</pre>
+        </div>
+
+        <!-- Step 7 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 7</span><span class="theory-title">Limpiar</span></div>
+          <pre>kubectl delete -f nginx-deployment-v2.yaml
+kubectl delete -f nginx-configmap.yaml</pre>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear ConfigMap + Deployment y ver la v1 en el navegador</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Modificar el ConfigMap (texto + color) y aplicarlo</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ejecutar <code>kubectl rollout restart</code> y seguir el rolling update con <code>rollout status</code></span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ver la v2 en el navegador sin haber tenido downtime</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Hacer rollback con <code>kubectl rollout undo</code> y verificar</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la diferencia con Lab 2-3 (Pod directo vs Deployment para updates)</span><span class="ttag tt-theory">teoría</span></li>
+        </ul>
+      </div>
+
       <!-- ─── 2.3 LAB 2-A ─── -->
       <div class="module">
         <div class="mod-header">
