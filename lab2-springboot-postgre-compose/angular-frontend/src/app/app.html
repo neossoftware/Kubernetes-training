@@ -1,0 +1,152 @@
+<nav class="navbar navbar-dark bg-dark mb-4">
+  <div class="container">
+    <span class="navbar-brand fw-bold">&#128230; Gestión de Productos</span>
+    <span class="text-white-50 small">Lab 1.1B — Angular + Spring Boot</span>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Barra de búsqueda y botón crear -->
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <div class="input-group">
+        <input
+          type="text"
+          class="form-control"
+          placeholder="Buscar productos..."
+          [(ngModel)]="search"
+          (keyup.enter)="load()"
+        />
+        <button class="btn btn-outline-secondary" (click)="load()">Buscar</button>
+        @if (search) {
+          <button class="btn btn-outline-danger" (click)="search=''; load()">&#x2715;</button>
+        }
+      </div>
+    </div>
+    <div class="col-md-6 text-end">
+      <button class="btn btn-primary" (click)="openCreate()">
+        + Nuevo Producto
+      </button>
+    </div>
+  </div>
+
+  <!-- Alerta de error -->
+  @if (error()) {
+    <div class="alert alert-danger alert-dismissible" role="alert">
+      {{ error() }}
+      <button type="button" class="btn-close" (click)="error.set('')"></button>
+    </div>
+  }
+
+  <!-- Spinner de carga -->
+  @if (loading()) {
+    <div class="text-center py-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Cargando...</span>
+      </div>
+    </div>
+  }
+
+  <!-- Tabla de productos -->
+  @if (!loading()) {
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Productos</span>
+        <span class="badge bg-secondary">{{ total() }} registros</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Nombre</th>
+              <th scope="col">Precio</th>
+              <th scope="col">Stock</th>
+              <th scope="col">Descripción</th>
+              <th scope="col" class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of products(); track p.id) {
+              <tr>
+                <td class="text-muted">{{ p.id }}</td>
+                <td class="fw-medium">{{ p.name }}</td>
+                <td>${{ p.price | number:'1.2-2' }}</td>
+                <td>
+                  <span [class]="p.stock > 0 ? 'badge bg-success' : 'badge bg-danger'">
+                    {{ p.stock }}
+                  </span>
+                </td>
+                <td class="text-muted">{{ p.description || '—' }}</td>
+                <td class="text-center">
+                  <button class="btn btn-sm btn-outline-primary me-1" (click)="openEdit(p)" title="Editar">✏️</button>
+                  <button class="btn btn-sm btn-outline-danger" (click)="delete(p)" title="Eliminar">🗑️</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="text-center text-muted py-4">No hay productos registrados.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+</div>
+
+<!-- Modal Crear / Editar -->
+<div class="modal fade" tabindex="-1" aria-hidden="true" #productModal>
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">{{ editingId ? 'Editar Producto' : 'Nuevo Producto' }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        @if (formError()) {
+          <div class="alert alert-warning">{{ formError() }}</div>
+        }
+
+        <div class="mb-3">
+          <label class="form-label">Nombre <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" [(ngModel)]="form.name" placeholder="Nombre del producto" />
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Precio <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" class="form-control" [(ngModel)]="form.price" min="0" step="0.01" />
+            </div>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Stock <span class="text-danger">*</span></label>
+            <input type="number" class="form-control" [(ngModel)]="form.stock" min="0" />
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Descripción</label>
+          <textarea class="form-control" [(ngModel)]="form.description" rows="2" placeholder="Opcional"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving()">
+          @if (saving()) {
+            <span class="spinner-border spinner-border-sm me-1"></span>
+          }
+          {{ saving() ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>

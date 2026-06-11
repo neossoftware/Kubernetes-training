@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lab2-postgres
+    environment:
+      POSTGRES_DB: labdb
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ninja123
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - lab2-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d labdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./products-api
+      dockerfile: Dockerfile
+    container_name: lab2-api
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: labdb
+      DB_USER: admin
+      DB_PASSWORD: ninja123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8080:8080"
+    networks:
+      - lab2-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./angular-frontend
+      dockerfile: Dockerfile
+    container_name: lab2-frontend
+    ports:
+      - "4200:80"
+    networks:
+      - lab2-net
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    name: lab2-pgdata
+
+networks:
+  lab2-net:
+    driver: bridge
