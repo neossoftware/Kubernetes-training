@@ -293,9 +293,36 @@ code { font-family:var(--mono); font-size:12px; background:#f1f5f9; border:1px s
 @media(max-width:640px){
   .hero { padding:28px 16px; }
   .hero h1 { font-size:26px; }
-  .main { padding:20px 14px; }
-  .module { padding:16px; }
+  .hero-sub { font-size:14px; }
+  .main { padding:12px 10px; }
+  .module { padding:12px; }
   .phase-header { padding:14px 16px; }
+
+  /* Código — más pequeño y con scroll horizontal */
+  pre { font-size:10.5px; padding:10px 10px; line-height:1.5; border-radius:6px; }
+  code { font-size:10.5px; }
+  .file-tree { font-size:10.5px; padding:10px 12px; }
+
+  /* Texto general de teoría */
+  .theory-body { font-size:12.5px; }
+  .theory-title { font-size:13px; }
+  .step-title { font-size:12.5px; }
+  .step-desc { font-size:12px; }
+  .task-text { font-size:12px; }
+
+  /* Colapsar grids de 2 columnas a 1 en mobile */
+  .lab-overview { grid-template-columns:1fr; }
+  .k8s-nodes { grid-template-columns:1fr; }
+  .two-col-grid { grid-template-columns:1fr !important; }
+
+  /* Tablas — scroll horizontal */
+  table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; font-size:.78rem; }
+
+  /* Cuadros de teoría con inline styles — reducir padding */
+  .theory-block { padding:0; }
+
+  /* Copy button más pequeño en mobile */
+  .copy-btn { font-size:10px; padding:3px 8px; }
 }
 
 /* ── LABEL/SELECTOR DIAGRAM ── */
@@ -4548,7 +4575,7 @@ kubectl delete -f nginx-configmap.yaml</pre>
           <div style="background:#fef9c3;border:1.5px solid #fbbf24;border-radius:10px;padding:14px 18px;margin:12px 0;color:#713f12;">
             <strong>⚠️ Importante:</strong> Los valores en el YAML de un Secret están en <strong>base64</strong> — eso es encoding, no cifrado. Cualquiera que lea el archivo puede decodificarlos con <code>base64 -d</code>. Para cifrado real en producción se usan herramientas como <em>Sealed Secrets</em> o la integración con un KMS (AWS KMS, HashiCorp Vault).
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;">
+          <div class="two-col-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;">
             <div style="background:#f0fdf4;border:1.5px solid #4ade80;border-radius:10px;padding:16px;">
               <div style="font-weight:700;color:#166534;margin-bottom:8px;">ConfigMap</div>
               <div style="font-size:.9rem;color:#14532d;">Configuración no sensible<br>nginx.conf, variables de app<br>Visible en texto plano</div>
@@ -4873,7 +4900,7 @@ kubectl get secrets <span class="c"># db-secret eliminado</span></pre>
             <p>El historial de revisiones de un Deployment guarda <strong>snapshots del Pod template</strong> — imagen, variables de entorno, recursos. Cuando cambias la imagen, eso queda en el historial y <code>rollout undo</code> puede restaurarlo.</p>
             <p style="margin-top:8px;">Un ConfigMap es un objeto completamente separado — el Deployment solo guarda su <em>nombre</em>, no su contenido. Por eso en Lab 2-5 el undo no podía revertir lo que no había registrado.</p>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
+          <div class="two-col-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
             <div style="background:#fff1f2;border:1.5px solid #fca5a5;border-radius:10px;padding:16px;">
               <div style="font-weight:700;color:#991b1b;margin-bottom:8px;">Lab 2-5 — ConfigMap ✗</div>
               <div style="font-size:.88rem;color:#7f1d1d;line-height:1.7;">Deployment guarda: <code>configmap: nginx-html</code><br>Solo el nombre — el contenido vive afuera.<br><code>rollout undo</code> revierte el Deployment<br>pero el ConfigMap no cambia.</div>
@@ -4949,7 +4976,7 @@ curl http://localhost:30092/api/products</pre>
           <div class="theory-body">
             <p>Antes de actualizar, hay dos formas de hacerlo. Entender la diferencia es clave para producción:</p>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;">
+          <div class="two-col-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;">
             <div style="background:#fff7ed;border:1.5px solid #fb923c;border-radius:10px;padding:16px;">
               <div style="font-weight:700;color:#9a3412;margin-bottom:6px;">⚡ Imperativo — solo para testing</div>
               <div style="font-size:.88rem;color:#7c2d12;line-height:1.7;"><code>kubectl set image deployment/products-api api=lab2-7-products-api:v2</code><br><br>Cambia el clúster pero <strong>no actualiza el YAML</strong>. Si alguien hace <code>kubectl apply</code> con el archivo original, la imagen vuelve a v1. El YAML y el clúster quedan desincronizados.</div>
@@ -5100,7 +5127,7 @@ kubectl delete -f k8s/secret.yaml</pre>
             <p>En Docker Compose, el browser llamaba directo a <code>http://localhost:3000</code> para la API. En Kubernetes eso cambia: cada servicio vive en su propio Pod, con su propia IP interna. La comunicación entre servicios se hace a través de <strong>Services</strong>.</p>
             <p style="margin-top:10px;">Este lab tiene dos tipos de Service en acción al mismo tiempo:</p>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
+          <div class="two-col-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
             <div style="background:#f0f9ff;border:1.5px solid #38bdf8;border-radius:10px;padding:16px;">
               <div style="font-weight:700;color:#0369a1;margin-bottom:6px;">NodePort — acceso externo</div>
               <div style="font-size:.9rem;color:#0c4a6e;">El frontend se expone en <code>localhost:30080</code>. Desde ahí el browser carga la app React.</div>
