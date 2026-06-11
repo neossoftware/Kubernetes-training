@@ -96,9 +96,14 @@ En los logs NO aparece nada — v1 no tiene logging. Confirma que estás en v1.
 
 ## Step 4 — Rolling update a v2
 
+> **Imperativo vs Declarativo:**
+> `kubectl set image` cambia el clúster pero **no actualiza el YAML** — si alguien
+> hace `kubectl apply` con el archivo original, la imagen vuelve a v1. En producción
+> siempre se actualiza el YAML y se aplica: el archivo es la fuente de verdad.
+
 ```bash
-# Actualizar la imagen — K8s reemplaza los 3 pods de uno en uno
-kubectl set image deployment/products-api api=lab2-7-products-api:v2
+# Enfoque declarativo — aplicar el YAML con la imagen v2
+kubectl apply -f k8s/api-deployment-v2.yaml
 
 # Seguir el rolling update en tiempo real
 kubectl rollout status deployment/products-api
@@ -181,7 +186,7 @@ kubectl delete -f k8s/secret.yaml
 
 | Concepto | Descripción |
 |----------|-------------|
-| `kubectl set image` | Cambia la imagen de un contenedor sin editar el YAML |
+| `kubectl set image` | Imperativo: cambia la imagen sin editar el YAML (sólo para testing) |
 | `kubectl rollout status` | Muestra el progreso del rolling update en tiempo real |
 | `kubectl rollout history` | Lista las revisiones del Deployment |
 | `kubectl rollout undo` | Revierte al Deployment spec anterior (imagen incluida) |
