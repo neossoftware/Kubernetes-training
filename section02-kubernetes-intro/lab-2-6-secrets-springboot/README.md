@@ -48,11 +48,26 @@ El código fuente de la API está en:
 
 ## Pre-requisito — PostgreSQL corriendo en Docker
 
-El contenedor `postgres-lab` del Lab 0.1 debe estar activo:
+Verifica el estado del contenedor `postgres-lab` del Lab 0.1:
 
 ```bash
-docker ps | grep postgres-lab
-# Si no está corriendo, levántalo:
+docker ps -a | grep postgres-lab
+```
+
+**Caso 1 — Está corriendo** (STATUS "Up"): no hay que hacer nada, continúa al Step 1.
+
+**Caso 2 — Existe pero está detenido** (STATUS "Exited"): solo arráncalo:
+
+```bash
+docker start postgres-lab
+docker exec postgres-lab pg_isready -U admin -d labdb
+# localhost:5432 - accepting connections
+```
+
+**Caso 3 — No existe**: créalo desde cero. Incluye **todos** los flags — si faltan
+las variables de entorno PostgreSQL no puede inicializarse:
+
+```bash
 docker run -d \
   --name postgres-lab \
   -e POSTGRES_DB=labdb \
@@ -62,6 +77,10 @@ docker run -d \
   -v postgres-data:/var/lib/postgresql/data \
   -p 5432:5432 \
   postgres:16-alpine
+
+# Esperar ~5s y verificar
+docker exec postgres-lab pg_isready -U admin -d labdb
+# localhost:5432 - accepting connections
 ```
 
 La clave es `-p 5432:5432` — expone la BD al host para que los Pods de K8s puedan alcanzarla.

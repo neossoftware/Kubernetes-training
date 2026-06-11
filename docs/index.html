@@ -4580,13 +4580,20 @@ kubectl delete -f nginx-configmap.yaml</pre>
         <!-- Step 1 -->
         <div class="theory-block">
           <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Verificar que PostgreSQL está corriendo en Docker</span></div>
-          <div class="theory-body"><p>La BD del Lab 0.1 debe estar activa con puerto <code>5432</code> expuesto al host:</p></div>
-          <pre>docker ps | grep postgres-lab
-<span class="c"># CONTAINER ID   IMAGE              PORTS                    NAMES</span>
-<span class="c"># abc123         postgres:16-alpine  0.0.0.0:5432->5432/tcp   postgres-lab</span>
-
-<span class="c"># Si no está corriendo:</span>
-docker run -d \
+          <div class="theory-body"><p>La BD del Lab 0.1 debe estar activa con puerto <code>5432</code> expuesto al host. Hay tres posibles estados:</p></div>
+          <pre><span class="c"># Verificar el estado del contenedor</span>
+docker ps -a | grep postgres-lab</pre>
+          <div class="theory-body" style="margin-top:10px;">
+            <p><strong>Caso 1 — Está corriendo</strong> (aparece en la lista con STATUS "Up"): no hay que hacer nada, continúa al Step 2.</p>
+            <p style="margin-top:8px;"><strong>Caso 2 — Existe pero está detenido</strong> (STATUS "Exited"): solo arráncalo:</p>
+          </div>
+          <pre>docker start postgres-lab
+docker exec postgres-lab pg_isready -U admin -d labdb
+<span class="c"># localhost:5432 - accepting connections</span></pre>
+          <div class="theory-body" style="margin-top:10px;">
+            <p><strong>Caso 3 — No existe</strong> (no aparece en la lista): créalo desde cero. Asegúrate de incluir <strong>todos</strong> los flags — si faltan las variables de entorno PostgreSQL no puede inicializarse:</p>
+          </div>
+          <pre>docker run -d \
   --name postgres-lab \
   -e POSTGRES_DB=labdb \
   -e POSTGRES_USER=admin \
@@ -4594,7 +4601,11 @@ docker run -d \
   -e PGDATA=/var/lib/postgresql/data/pgdata \
   -v postgres-data:/var/lib/postgresql/data \
   -p 5432:5432 \
-  postgres:16-alpine</pre>
+  postgres:16-alpine
+
+<span class="c"># Esperar ~5s y verificar que acepte conexiones</span>
+docker exec postgres-lab pg_isready -U admin -d labdb
+<span class="c"># localhost:5432 - accepting connections</span></pre>
         </div>
 
         <!-- Step 2 -->
