@@ -4517,23 +4517,21 @@ kubectl delete -f nginx-configmap.yaml</pre>
           <span class="mod-duration">Semana 3 — Lab completo</span>
         </div>
 
-        <!-- Objetivos del lab -->
-        <div class="lab-overview" style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:20px 24px;margin-bottom:20px;">
-          <div style="font-weight:700;font-size:1rem;color:#1e293b;margin-bottom:12px;">🎯 ¿Qué vas a aprender en este lab?</div>
-          <ul style="margin:0 0 0 18px;line-height:2;color:#334155;">
-            <li>Qué es un <strong>Kubernetes Secret</strong> y por qué usarlo en lugar de hardcodear credenciales</li>
-            <li>Cómo los valores del Secret llegan como <strong>variables de entorno</strong> al contenedor</li>
-            <li>Cómo <strong>Spring Boot</strong> lee esas variables desde <code>application.properties</code> con <code>${VAR}</code></li>
-            <li>Por qué la BD (<strong>PostgreSQL</strong>) vive fuera del clúster — simulando una VM o RDS en producción</li>
-            <li>Cómo los Pods de K8s se conectan a un servicio externo usando <code>host.docker.internal</code></li>
-          </ul>
-          <div style="margin-top:14px;font-weight:700;font-size:1rem;color:#1e293b;margin-bottom:10px;">🛠 ¿Qué vas a construir?</div>
-          <ul style="margin:0 0 0 18px;line-height:2;color:#334155;">
-            <li>Un <strong>Secret</strong> con las credenciales de la BD (usuario, password, nombre de BD)</li>
-            <li>Un <strong>Deployment de 3 réplicas</strong> de la Spring Boot Products API que lee ese Secret</li>
-            <li>Un <strong>Service NodePort</strong> en el puerto <code>30092</code> para probar la API con <code>curl</code></li>
-            <li>La conexión real a <strong>PostgreSQL en Docker</strong> (fuera del clúster K8s)</li>
-          </ul>
+        <div class="lab-overview">
+          <div class="lab-overview-box lov-what">
+            <h4>¿Qué haremos?</h4>
+            <p>Desplegaremos la <strong>Spring Boot Products API</strong> en Kubernetes conectándola a la base de datos PostgreSQL del Lab 0.1, que corre en Docker <strong>fuera del clúster</strong> — simulando una BD en VM o RDS de producción. Usaremos un <strong>Secret</strong> para manejar las credenciales de forma segura.</p>
+          </div>
+          <div class="lab-overview-box lov-goals">
+            <h4>Objetivos de aprendizaje</h4>
+            <ul>
+              <li>Crear y aplicar un <strong>Kubernetes Secret</strong> con credenciales de BD</li>
+              <li>Entender cómo el Secret llega al Pod como <strong>variable de entorno</strong></li>
+              <li>Ver cómo <strong>Spring Boot</strong> lee esas variables con <code>${VAR}</code> en <code>application.properties</code></li>
+              <li>Conectar Pods de K8s a un servicio externo con <code>host.docker.internal</code></li>
+              <li>Probar un <strong>Deployment de 3 réplicas</strong> con <code>curl</code> desde tu máquina</li>
+            </ul>
+          </div>
         </div>
 
         <!-- Teoría: Secrets -->
