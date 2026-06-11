@@ -3280,6 +3280,199 @@ kubectl get pods
         </ul>
       </div>
 
+      <!-- ─── 2.2 Services + Lab ─── -->
+      <div class="module">
+        <div class="mod-header">
+          <span class="mod-icon">🔌</span>
+          <span class="mod-title">2.2 — Services: cómo exponer tus Pods</span>
+          <span class="mod-duration">Semana 4 — Teoría + Lab</span>
+        </div>
+
+        <!-- Teoría: qué es un Service -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Qué problema resuelve un Service?</span></div>
+          <div class="theory-body">
+            <p>Los Pods son <strong>efímeros</strong> — pueden morir y renacer con una IP diferente cada vez. Si tu frontend habla directamente con la IP de un Pod, se rompe cada vez que el Pod se reinicia.</p>
+            <p>Un <strong>Service</strong> es un recurso de Kubernetes que actúa como una dirección estable frente a un grupo de Pods. No importa cuántas veces mueran y renazcan los Pods — el Service siempre apunta a los que estén vivos usando <strong>labels</strong> como selector.</p>
+            <pre>Sin Service:  Frontend → 10.1.0.45 (Pod muere) → ❌ conexión rota
+Con Service:  Frontend → hello-svc → 10.1.0.45
+                                   → 10.1.0.67  (K8s balancea automáticamente)
+                                   → 10.1.0.89</pre>
+          </div>
+        </div>
+
+        <!-- Tipos de Service -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Tipos de Service</span></div>
+          <div class="theory-body">
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+              <thead>
+                <tr style="background:#f1f5f9;">
+                  <th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Tipo</th>
+                  <th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Alcance</th>
+                  <th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Cuándo usarlo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background:#eff6ff;">
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;"><code>ClusterIP</code> <span style="font-size:10px;color:#64748b;">(default)</span></td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">Solo dentro del cluster</td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">Comunicación interna entre microservicios</td>
+                </tr>
+                <tr style="background:#f0fdf4;">
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;"><code>NodePort</code></td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">Puerto fijo en cada nodo (30000–32767)</td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">Desarrollo local con minikube / Docker Desktop</td>
+                </tr>
+                <tr style="background:#fff7ed;">
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;"><code>LoadBalancer</code></td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">IP pública via cloud (GCP/AWS/Azure)</td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">Producción — exponer al internet</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 10px;"><code>ExternalName</code></td>
+                  <td style="padding:6px 10px;">Alias DNS a un servicio externo</td>
+                  <td style="padding:6px 10px;">Apuntar a una DB externa o API de terceros</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <p style="margin-top:10px;">En este lab usaremos <strong>NodePort</strong> — es el tipo más simple para acceder desde el navegador en local sin necesitar un cloud provider.</p>
+          </div>
+        </div>
+
+        <!-- Cómo funciona el selector -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Labels y Selectors: el pegamento entre Service y Pod</span></div>
+          <div class="theory-body">
+            <p>Un Service no conoce los Pods por nombre — los descubre por sus <strong>labels</strong>. Esto permite que el Service balancee entre múltiples Pods automáticamente.</p>
+          </div>
+          <pre><span class="c"># El Pod tiene un label:</span>
+<span class="k">metadata:</span>
+  <span class="k">labels:</span>
+    <span class="k">app:</span> mi-nginx    <span class="c">← etiqueta</span>
+
+<span class="c"># El Service busca Pods con ese label:</span>
+<span class="k">spec:</span>
+  <span class="k">selector:</span>
+    <span class="k">app:</span> mi-nginx    <span class="c">← K8s conecta automáticamente</span></pre>
+          <div class="theory-body" style="margin-top:6px;">
+            <p>Si tienes 3 Pods con <code>app: mi-nginx</code>, el Service distribuye el tráfico entre los tres. Si uno muere, K8s lo quita del pool automáticamente.</p>
+          </div>
+        </div>
+
+        <!-- Lab -->
+        <div class="lab-overview">
+          <div class="lab-overview-box lov-what">
+            <h4>¿Qué haremos?</h4>
+            <p>Crearemos un Pod de nginx con un <strong>archivo YAML</strong> que incluye el Pod y su Service. Lo expondremos con <strong>NodePort</strong> y accederemos desde el navegador — sin port-forward.</p>
+          </div>
+          <div class="lab-overview-box lov-goals">
+            <h4>Objetivos de aprendizaje</h4>
+            <ul>
+              <li>Escribir tu primer manifiesto YAML con Pod + Service</li>
+              <li>Entender la conexión via labels/selector</li>
+              <li>Diferencia entre <code>port</code>, <code>targetPort</code> y <code>nodePort</code></li>
+              <li>Acceder a un Pod sin port-forward usando NodePort</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Crear el manifiesto YAML</span></div>
+          <div class="theory-body">
+            <p>En un solo archivo definimos el Pod y el Service separados por <code>---</code>.</p>
+          </div>
+          <div class="filename">nginx-service.yaml</div>
+          <pre><span class="c"># ── Pod ─────────────────────────────────────────</span>
+<span class="k">apiVersion:</span> v1
+<span class="k">kind:</span> Pod
+<span class="k">metadata:</span>
+  <span class="k">name:</span> mi-nginx
+  <span class="k">labels:</span>
+    <span class="k">app:</span> mi-nginx    <span class="c"># el Service usará este label para encontrarlo</span>
+<span class="k">spec:</span>
+  <span class="k">containers:</span>
+    - <span class="k">name:</span> nginx
+      <span class="k">image:</span> nginx:1.27-alpine
+      <span class="k">ports:</span>
+        - <span class="k">containerPort:</span> 80
+---
+<span class="c"># ── Service ─────────────────────────────────────</span>
+<span class="k">apiVersion:</span> v1
+<span class="k">kind:</span> Service
+<span class="k">metadata:</span>
+  <span class="k">name:</span> mi-nginx-svc
+<span class="k">spec:</span>
+  <span class="k">selector:</span>
+    <span class="k">app:</span> mi-nginx    <span class="c"># conecta con el Pod de arriba</span>
+  <span class="k">type:</span> NodePort
+  <span class="k">ports:</span>
+    - <span class="k">port:</span> 80        <span class="c"># puerto del Service dentro del cluster</span>
+      <span class="k">targetPort:</span> 80  <span class="c"># puerto del container nginx</span>
+      <span class="k">nodePort:</span> 30090 <span class="c"># puerto accesible desde tu máquina</span></pre>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Aplicar y verificar</span></div>
+          <pre><span class="c"># Aplicar el manifiesto (crea Pod y Service de una vez)</span>
+kubectl apply -f nginx-service.yaml
+
+<span class="c"># Verificar el Pod</span>
+kubectl get pods
+<span class="c"># NAME       READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># mi-nginx   1/1     Running   0          8s</span>
+
+<span class="c"># Verificar el Service</span>
+kubectl get svc
+<span class="c"># NAME           TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE</span>
+<span class="c"># kubernetes     ClusterIP   10.96.0.1       &lt;none&gt;        443/TCP        2d</span>
+<span class="c"># mi-nginx-svc   NodePort    10.96.58.12     &lt;none&gt;        80:30090/TCP   8s</span>
+
+<span class="c"># Ver que el Service apunta al Pod correcto</span>
+kubectl get endpoints mi-nginx-svc
+<span class="c"># NAME           ENDPOINTS        AGE</span>
+<span class="c"># mi-nginx-svc   10.1.0.45:80     8s   ← IP del Pod</span></pre>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Acceder desde el navegador</span></div>
+          <pre><span class="c">## ── Docker Desktop ──────────────────────────────</span>
+<span class="c"># Abrir directamente en el navegador:</span>
+<span class="c"># http://localhost:30090</span>
+
+<span class="c">## ── minikube ────────────────────────────────────</span>
+minikube service mi-nginx-svc --url
+<span class="c"># http://127.0.0.1:XXXXX  ← abrir esa URL</span></pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <p>Deberías ver la página por defecto de nginx: <em>"Welcome to nginx!"</em> — esta vez sin port-forward, expuesto de forma permanente a través del Service.</p>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Limpiar</span></div>
+          <pre><span class="c"># kubectl delete -f elimina todos los recursos definidos en el archivo</span>
+kubectl delete -f nginx-service.yaml
+
+<span class="c"># Verificar limpieza</span>
+kubectl get pods
+kubectl get svc
+<span class="c"># Solo debe quedar el Service "kubernetes" que es del sistema</span></pre>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear <code>nginx-service.yaml</code> con Pod + Service NodePort</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Aplicar con <code>kubectl apply -f</code> y verificar Pod Running + Service creado</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ver nginx en el navegador vía NodePort (sin port-forward)</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la diferencia entre <code>port</code>, <code>targetPort</code> y <code>nodePort</code></span><span class="ttag tt-theory">teoría</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Limpiar con <code>kubectl delete -f nginx-service.yaml</code></span><span class="ttag tt-lab">lab</span></li>
+        </ul>
+      </div>
+
       <!-- ─── 2.2 Lab 2-0: Hello World ─── -->
       <div class="module">
         <div class="mod-header">
