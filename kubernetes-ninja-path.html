@@ -3277,6 +3277,21 @@ kubectl get pods
 <span class="c"># No resources found in default namespace.</span></pre>
         </div>
 
+        <!-- Teoría: qué es un Pod -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Pod: la unidad mínima de K8s</span></div>
+          <div class="theory-body">
+            <p>Un <strong>Pod</strong> es el objeto más pequeño de K8s. Un pod encapsula uno o más containers que comparten:</p>
+            <ul>
+              <li><strong>Red:</strong> misma IP, mismo localhost. Si tienes 2 containers en un pod, se comunican por localhost.</li>
+              <li><strong>Storage:</strong> pueden compartir volúmenes.</li>
+              <li><strong>Ciclo de vida:</strong> arrancan y mueren juntos.</li>
+            </ul>
+            <p>En la práctica, <strong>99% de los pods tienen un solo container</strong>. El patrón de múltiples containers (sidecar, ambassador, adapter) se usa para casos específicos como logging, proxies, etc.</p>
+            <p><strong>Los pods son efímeros.</strong> Si un pod falla, K8s puede crear uno nuevo, pero con nueva IP. Por eso nunca trabajas directamente con pods en producción — usas Deployments que los gestionan.</p>
+          </div>
+        </div>
+
         <!-- Concepto: port-forward vs Service -->
         <div class="theory-block">
           <div class="theory-header"><span class="theory-tag">Concepto</span><span class="theory-title">¿Cuándo usar port-forward vs un Service?</span></div>
@@ -3980,20 +3995,6 @@ kubectl get namespaces</pre>
           <span class="mod-icon">📦</span>
           <span class="mod-title">2.3 — Pods, Deployments y Services</span>
           <span class="mod-duration">Semana 4 — Teoría</span>
-        </div>
-
-        <div class="theory-block">
-          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Pod: la unidad mínima de K8s</span></div>
-          <div class="theory-body">
-            <p>Un <strong>Pod</strong> es el objeto más pequeño de K8s. Un pod encapsula uno o más containers que comparten:</p>
-            <ul>
-              <li><strong>Red:</strong> misma IP, mismo localhost. Si tienes 2 containers en un pod, se comunican por localhost.</li>
-              <li><strong>Storage:</strong> pueden compartir volúmenes.</li>
-              <li><strong>Ciclo de vida:</strong> arrancan y mueren juntos.</li>
-            </ul>
-            <p>En la práctica, <strong>99% de los pods tienen un solo container</strong>. El patrón de múltiples containers (sidecar, ambassador, adapter) se usa para casos específicos como logging, proxies, etc.</p>
-            <p><strong>Los pods son efímeros.</strong> Si un pod falla, K8s puede crear uno nuevo, pero con nueva IP. Por eso nunca trabajas directamente con pods — usas Deployments que los gestionan.</p>
-          </div>
         </div>
 
         <div class="theory-block">
