@@ -298,6 +298,26 @@ code { font-family:var(--mono); font-size:12px; background:#f1f5f9; border:1px s
   .phase-header { padding:14px 16px; }
 }
 
+/* ── LABEL/SELECTOR DIAGRAM ── */
+.ls-diagram { display:grid; grid-template-columns:1fr auto 1fr; gap:0; align-items:center; margin:12px 0; }
+.ls-card { border-radius:8px; overflow:hidden; border:1.5px solid #e2e8f0; }
+.ls-card-header { padding:7px 14px; font-family:var(--sans); font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; }
+.ls-card.pod .ls-card-header  { background:#059669; color:white; }
+.ls-card.svc .ls-card-header  { background:#2563eb; color:white; }
+.ls-card-body { background:#f8fafc; padding:10px 14px; font-family:var(--mono); font-size:11.5px; line-height:1.9; }
+.ls-key { color:#7c3aed; font-weight:600; }
+.ls-val { color:#1e293b; }
+.ls-highlight { background:#fef08a; border-radius:3px; padding:1px 5px; font-weight:700; color:#92400e; }
+.ls-arrow { display:flex; flex-direction:column; align-items:center; gap:4px; padding:0 14px; }
+.ls-arrow-line { width:2px; height:28px; background:linear-gradient(to bottom, #059669, #2563eb); }
+.ls-arrow-label { font-family:var(--sans); font-size:10px; font-weight:700; color:#64748b; text-align:center; white-space:nowrap; }
+.ls-arrow-icon { font-size:18px; color:#64748b; line-height:1; }
+.ls-match-badge { display:inline-flex; align-items:center; gap:6px; background:#fef9c3; border:1.5px solid #fde047; border-radius:20px; padding:4px 12px; font-size:11.5px; font-weight:700; color:#854d0e; margin-top:10px; }
+.ls-pods-row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+.ls-pod-chip { background:#dcfce7; border:1.5px solid #86efac; border-radius:6px; padding:4px 10px; font-family:var(--mono); font-size:10.5px; color:#166534; font-weight:600; }
+.ls-pod-chip.dead { background:#fee2e2; border-color:#fca5a5; color:#991b1b; text-decoration:line-through; opacity:.6; }
+@media(max-width:640px){ .ls-diagram { grid-template-columns:1fr; } .ls-arrow { flex-direction:row; padding:8px 0; } .ls-arrow-line { width:28px; height:2px; } }
+
 /* ── K8S ARCHITECTURE DIAGRAM ── */
 .k8s-diagram { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:20px 20px 16px; margin:12px 0; overflow-x:auto; }
 .k8s-diagram-title { text-align:center; font-family:var(--sans); font-size:12px; font-weight:700; color:var(--muted); margin-bottom:14px; letter-spacing:1px; text-transform:uppercase; }
@@ -3343,21 +3363,63 @@ Con Service:  Frontend → hello-svc → 10.1.0.45
 
         <!-- Cómo funciona el selector -->
         <div class="theory-block">
-          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Labels y Selectors: el pegamento entre Service y Pod</span></div>
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Labels y Selectors: cómo el Service encuentra el Pod</span></div>
           <div class="theory-body">
-            <p>Un Service no conoce los Pods por nombre — los descubre por sus <strong>labels</strong>. Esto permite que el Service balancee entre múltiples Pods automáticamente.</p>
-          </div>
-          <pre><span class="c"># El Pod tiene un label:</span>
-<span class="k">metadata:</span>
-  <span class="k">labels:</span>
-    <span class="k">app:</span> mi-nginx    <span class="c">← etiqueta</span>
+            <p>Un Service <strong>no conoce los Pods por nombre</strong> — los descubre por sus <strong>labels</strong>. Es como poner una etiqueta en una caja: el Service busca todas las cajas que tengan esa etiqueta y les manda tráfico.</p>
 
-<span class="c"># El Service busca Pods con ese label:</span>
-<span class="k">spec:</span>
-  <span class="k">selector:</span>
-    <span class="k">app:</span> mi-nginx    <span class="c">← K8s conecta automáticamente</span></pre>
-          <div class="theory-body" style="margin-top:6px;">
-            <p>Si tienes 3 Pods con <code>app: mi-nginx</code>, el Service distribuye el tráfico entre los tres. Si uno muere, K8s lo quita del pool automáticamente.</p>
+            <!-- Diagrama visual -->
+            <div class="ls-diagram">
+
+              <!-- Pod card -->
+              <div class="ls-card pod">
+                <div class="ls-card-header">📦 Pod — nginx-service.yaml</div>
+                <div class="ls-card-body">
+                  <span class="ls-key">metadata:</span><br>
+                  &nbsp;&nbsp;<span class="ls-key">name:</span> <span class="ls-val">mi-nginx</span><br>
+                  &nbsp;&nbsp;<span class="ls-key">labels:</span><br>
+                  &nbsp;&nbsp;&nbsp;&nbsp;<span class="ls-key">app:</span> <span class="ls-highlight">mi-nginx</span>
+                  <div style="margin-top:8px;font-size:10px;color:#64748b;font-family:var(--sans);">↑ El Pod se "etiqueta" con este valor</div>
+                </div>
+              </div>
+
+              <!-- Arrow -->
+              <div class="ls-arrow">
+                <div class="ls-arrow-label">K8s busca<br>Pods con</div>
+                <div class="ls-arrow-icon">⟷</div>
+                <div class="ls-match-badge">app: <span style="margin-left:4px;">mi-nginx</span></div>
+              </div>
+
+              <!-- Service card -->
+              <div class="ls-card svc">
+                <div class="ls-card-header">🔌 Service — nginx-service.yaml</div>
+                <div class="ls-card-body">
+                  <span class="ls-key">spec:</span><br>
+                  &nbsp;&nbsp;<span class="ls-key">selector:</span><br>
+                  &nbsp;&nbsp;&nbsp;&nbsp;<span class="ls-key">app:</span> <span class="ls-highlight">mi-nginx</span><br>
+                  &nbsp;&nbsp;<span class="ls-key">type:</span> <span class="ls-val">NodePort</span>
+                  <div style="margin-top:8px;font-size:10px;color:#64748b;font-family:var(--sans);">↑ El Service busca Pods con este label</div>
+                </div>
+              </div>
+
+            </div><!-- /ls-diagram -->
+
+            <p style="margin-top:12px;">Cuando el valor de <code>labels.app</code> en el Pod coincide exactamente con <code>selector.app</code> en el Service, K8s los conecta automáticamente. Si no coinciden — por ejemplo un typo — el Service queda sin Pods y no responde.</p>
+
+            <p><strong>¿Qué pasa si tienes 3 Pods con el mismo label?</strong> El Service distribuye el tráfico entre todos:</p>
+
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-top:6px;">
+              <div style="font-family:var(--sans);font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Tráfico entrante al Service</div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <div style="background:#2563eb;color:white;border-radius:6px;padding:5px 12px;font-family:var(--mono);font-size:11px;font-weight:700;">mi-nginx-svc</div>
+                <div style="color:#64748b;font-size:18px;">→</div>
+                <div class="ls-pods-row" style="margin:0;">
+                  <div class="ls-pod-chip">Pod 1 · 10.1.0.11</div>
+                  <div class="ls-pod-chip">Pod 2 · 10.1.0.12</div>
+                  <div class="ls-pod-chip dead">Pod 3 · 10.1.0.13</div>
+                </div>
+              </div>
+              <div style="font-family:var(--sans);font-size:11px;color:#64748b;margin-top:8px;">Pod 3 falló → K8s lo elimina del pool automáticamente. El tráfico solo va a Pod 1 y Pod 2.</div>
+            </div>
           </div>
         </div>
 
