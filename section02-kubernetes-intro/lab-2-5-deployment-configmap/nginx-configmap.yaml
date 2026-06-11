@@ -11,7 +11,7 @@ data:
       <style>
         body { font-family:sans-serif; display:flex; align-items:center;
                justify-content:center; min-height:100vh; margin:0;
-               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+               background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%); }
         .card { background:white; padding:40px 60px; border-radius:16px;
                 text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.3); }
         h1 { color:#1e293b; font-size:2.2rem; margin:0 0 10px; }

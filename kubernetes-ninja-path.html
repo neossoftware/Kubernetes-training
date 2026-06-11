@@ -4457,19 +4457,33 @@ kubectl get pods</pre>
 
         <!-- Step 6 -->
         <div class="theory-block">
-          <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Ver el historial y hacer rollback</span></div>
-          <pre><span class="c"># Ver historial de versiones del Deployment</span>
+          <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Rollback — importante: ConfigMap no está en el historial</span></div>
+          <div class="theory-body">
+            <div class="step-note">⚠️ <strong>Gotcha:</strong> <code>kubectl rollout undo</code> revierte la especificación del <em>Deployment</em> (imagen, variables, recursos), pero el <strong>ConfigMap es un objeto separado</strong> — no está incluido en el historial. Ambas revisiones apuntan al mismo nombre <code>nginx-html</code>, así que al hacer undo K8s restaura el Deployment pero el ConfigMap sigue con el contenido actual.</div>
+            <p style="margin-top:10px;">Para hacer rollback real cuando usas ConfigMaps, necesitas <strong>revertir el ConfigMap manualmente</strong> y luego reiniciar el Deployment:</p>
+          </div>
+          <pre><span class="c"># Ver el historial del Deployment (solo guarda cambios del Pod template)</span>
 kubectl rollout history deployment/nginx-deploy
 <span class="c"># REVISION  CHANGE-CAUSE</span>
-<span class="c"># 1         &lt;none&gt;</span>
-<span class="c"># 2         &lt;none&gt;</span>
+<span class="c"># 1         &lt;none&gt;   ← Deployment inicial</span>
+<span class="c"># 2         &lt;none&gt;   ← después del rollout restart</span>
 
-<span class="c"># Volver a la versión anterior si algo salió mal</span>
-kubectl rollout undo deployment/nginx-deploy
-<span class="c"># deployment.apps/nginx-deploy rolled back</span>
+<span class="c"># rollout undo aquí NO revierte el ConfigMap — solo el Deployment spec</span>
+<span class="c"># Es útil para revertir cambios de imagen, variables de entorno o recursos</span>
 
-<span class="c"># Verificar que volvió a la v1 (fondo azul-morado)</span>
-kubectl rollout status deployment/nginx-deploy</pre>
+<span class="c"># ── Rollback correcto con ConfigMap ──────────────────</span>
+<span class="c"># Paso 1: edita nginx-configmap.yaml de vuelta a los valores de v1</span>
+<span class="c">#         (restaura el gradiente azul-morado y el texto original)</span>
+kubectl apply -f nginx-configmap.yaml
+<span class="c"># configmap/nginx-html configured</span>
+
+<span class="c"># Paso 2: reiniciar los Pods para que tomen el ConfigMap revertido</span>
+kubectl rollout restart deployment/nginx-deploy
+kubectl rollout status deployment/nginx-deploy
+<span class="c"># deployment "nginx-deploy" successfully rolled out</span></pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <p>Recarga el navegador — verás la v1 de vuelta. <strong>La lección:</strong> si necesitas rollback real de ConfigMaps en producción, lo más robusto es versionar los archivos YAML en git y hacer <code>git revert</code> + <code>kubectl apply</code>.</p>
+          </div>
         </div>
 
         <!-- Step 7 -->
@@ -4481,10 +4495,9 @@ kubectl delete -f nginx-configmap.yaml</pre>
 
         <ul class="task-list">
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear ConfigMap + Deployment y ver la v1 en el navegador</span><span class="ttag tt-lab">lab</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Modificar el ConfigMap (texto + color) y aplicarlo</span><span class="ttag tt-lab">lab</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ejecutar <code>kubectl rollout restart</code> y seguir el rolling update con <code>rollout status</code></span><span class="ttag tt-lab">lab</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ver la v2 en el navegador sin haber tenido downtime</span><span class="ttag tt-lab">lab</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Hacer rollback con <code>kubectl rollout undo</code> y verificar</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Modificar el ConfigMap (texto + color) y hacer rolling update con <code>rollout restart</code></span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ver la v2 en el navegador sin downtime</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Revertir el ConfigMap a v1 + <code>rollout restart</code> y explicar por qué <code>rollout undo</code> no es suficiente</span><span class="ttag tt-theory">teoría</span></li>
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la diferencia con Lab 2-3 (Pod directo vs Deployment para updates)</span><span class="ttag tt-theory">teoría</span></li>
         </ul>
       </div>

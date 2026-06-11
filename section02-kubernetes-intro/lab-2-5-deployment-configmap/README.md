@@ -94,19 +94,37 @@ En ningún momento la app dejó de responder.
 
 ## Step 4 — Historial y Rollback
 
+> ⚠️ **Gotcha importante:** `kubectl rollout undo` revierte la especificación del *Deployment*
+> (imagen, variables de entorno, recursos), pero el **ConfigMap es un objeto separado** — no
+> está incluido en el historial de revisiones. Ambas revisiones apuntan al mismo nombre
+> `nginx-html`, así que al hacer undo K8s restaura el Deployment pero el ConfigMap sigue
+> con el contenido actual.
+>
+> Para rollback real cuando usas ConfigMaps hay que **revertir el ConfigMap manualmente**.
+
 ```bash
-# Ver historial de versiones
+# Ver el historial — muestra cambios del Pod template, no del ConfigMap
 kubectl rollout history deployment/nginx-deploy
 # REVISION  CHANGE-CAUSE
-# 1         <none>
-# 2         <none>
+# 1         <none>   ← Deployment inicial
+# 2         <none>   ← después del rollout restart
 
-# Volver a la versión anterior
-kubectl rollout undo deployment/nginx-deploy
+# ── Rollback correcto con ConfigMap ──────────────────────────
+# 1. Edita nginx-configmap.yaml de vuelta a los valores de v1
+#    (restaura el gradiente azul-morado y el texto original)
+kubectl apply -f nginx-configmap.yaml
+# configmap/nginx-html configured
+
+# 2. Reiniciar los Pods para que tomen el ConfigMap revertido
+kubectl rollout restart deployment/nginx-deploy
 kubectl rollout status deployment/nginx-deploy
-
-# Verificar: volvió la v1 (fondo azul-morado)
+# deployment "nginx-deploy" successfully rolled out
 ```
+
+Recarga `http://localhost:30091` — verás la v1 de vuelta.
+
+**La lección:** si necesitas rollback real de ConfigMaps en producción, lo más robusto
+es versionar los archivos YAML en git y hacer `git revert` + `kubectl apply`.
 
 ---
 
@@ -126,5 +144,5 @@ kubectl delete -f nginx-configmap.yaml
 | `rollout restart` | Recrea los Pods de uno en uno con el ConfigMap actualizado |
 | `rollout status` | Muestra el progreso del rolling update en tiempo real |
 | `rollout history` | Lista las revisiones anteriores del Deployment |
-| `rollout undo` | Vuelve a la revisión anterior (rollback) |
+| `rollout undo` | Revierte el Pod template del Deployment (NO el ConfigMap) |
 | Rolling Update | K8s nunca deja de haber Pods disponibles durante la actualización |
