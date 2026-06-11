@@ -3864,9 +3864,78 @@ kubectl exec -it hello-pod -n hello -- sh
 kubectl get all -n hello</pre>
         </div>
 
-        <!-- Step 7: Cleanup -->
+        <!-- Parte 2: Modificar ConfigMap y redesplegar -->
+        <div style="margin:20px 0 8px;padding:10px 16px;background:#fef9c3;border:1.5px solid #fde047;border-radius:8px;font-family:var(--sans);font-size:13px;font-weight:700;color:#854d0e;">
+          🔄 Parte 2 — Modifica el ConfigMap y ve los cambios en vivo
+        </div>
+
         <div class="theory-block">
-          <div class="theory-header"><span class="theory-tag">Step 7</span><span class="theory-title">Limpiar el lab</span></div>
+          <div class="theory-header"><span class="theory-tag">Step 7</span><span class="theory-title">Editar el ConfigMap</span></div>
+          <div class="theory-body">
+            <p>Abre <code>hello-configmap.yaml</code> y cambia el contenido del HTML. Por ejemplo modifica el título y el color de fondo:</p>
+          </div>
+          <div class="filename">hello-configmap.yaml — cambios destacados</div>
+          <pre><span class="k">data:</span>
+  <span class="k">index.html:</span> |
+    <span class="c"># ... estilos ...</span>
+    background: <span class="s">linear-gradient(135deg, #f59e0b 0%, #dc2626 100%)</span>;  <span class="c">← cambia color</span>
+    <span class="c"># ... en el body ...</span>
+    &lt;h1&gt;&#9096; <span class="s">¡Actualizado con ConfigMap!</span>&lt;/h1&gt;              <span class="c">← cambia texto</span>
+    &lt;p&gt;<span class="s">El Pod fue recreado con la nueva configuración.</span>&lt;/p&gt;
+    &lt;div class="badge"&gt;<span class="s">nginx · Lab 2-3 · v2</span>&lt;/div&gt;              <span class="c">← cambia badge</span></pre>
+        </div>
+
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 8</span><span class="theory-title">Aplicar el ConfigMap actualizado</span></div>
+          <pre><span class="c"># Aplica el ConfigMap — K8s lo actualiza en el cluster</span>
+kubectl apply -f hello-configmap.yaml
+<span class="c"># configmap/hello-html configured  ← dice "configured", no "created"</span>
+
+<span class="c"># Verifica que el cambio está guardado en K8s</span>
+kubectl describe configmap hello-html -n hello</pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <div class="step-note">⚠️ K8s sincroniza el volumen montado automáticamente (~60s), pero <strong>nginx no recarga archivos en caliente</strong>. Necesitas recrear el Pod para que nginx sirva el nuevo HTML.</div>
+          </div>
+        </div>
+
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 9</span><span class="theory-title">Recrear el Pod para que tome los cambios</span></div>
+          <div class="theory-body">
+            <p>Como es un Pod standalone (no un Deployment), la forma de "reiniciarlo" es borrarlo y volver a crearlo. K8s lo levanta en segundos.</p>
+          </div>
+          <pre><span class="c"># Borrar el Pod actual</span>
+kubectl delete pod hello-pod -n hello
+<span class="c"># pod "hello-pod" deleted</span>
+
+<span class="c"># Crearlo de nuevo (ya tomará el ConfigMap actualizado)</span>
+kubectl apply -f hello-app.yaml
+<span class="c"># pod/hello-pod created</span>
+<span class="c"># service/hello-svc unchanged  ← el Service no necesita recrearse</span>
+
+<span class="c"># Esperar a que esté Running</span>
+kubectl get pods -n hello -w
+<span class="c"># NAME        READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># hello-pod   1/1     Running   0          5s</span></pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <p>Recarga <strong>http://localhost:30080</strong> en el navegador — deberías ver el nuevo título y el fondo naranja-rojo.</p>
+            <div class="step-ok">¡Acabas de actualizar la configuración de una app en Kubernetes sin tocar la imagen Docker! Este es exactamente el flujo que se usa en producción para cambiar variables de entorno, archivos de config o feature flags.</div>
+          </div>
+        </div>
+
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Concepto</span><span class="theory-title">¿Por qué con Deployment es más fácil?</span></div>
+          <div class="theory-body">
+            <p>Con un Deployment no necesitas borrar y recrear manualmente — un solo comando lo hace sin downtime:</p>
+          </div>
+          <pre><span class="c"># Con Deployment (lo verás en Lab 2-A):</span>
+kubectl apply -f hello-configmap.yaml
+kubectl rollout restart deployment/hello -n hello
+<span class="c"># K8s crea Pods nuevos con el ConfigMap actualizado y borra los viejos automáticamente</span></pre>
+        </div>
+
+        <!-- Step 10: Cleanup -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 10</span><span class="theory-title">Limpiar el lab</span></div>
           <pre><span class="c"># Eliminar todo el namespace (borra todos los recursos dentro)</span>
 kubectl delete namespace hello
 
@@ -3895,11 +3964,12 @@ kubectl get namespaces</pre>
         </div>
 
         <ul class="task-list">
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Verificar cluster activo con <code>kubectl get nodes</code></span><span class="ttag tt-setup">setup</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear namespace <code>hello</code> y aplicar los 2 manifiestos YAML</span><span class="ttag tt-lab">lab</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ver la página "Hello from Kubernetes!" en el navegador</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear namespace <code>hello</code> y aplicar ConfigMap + Pod + Service</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ver la página "Hello from Kubernetes!" en el navegador vía NodePort</span><span class="ttag tt-lab">lab</span></li>
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Practicar: <code>describe</code>, <code>logs</code>, <code>exec</code>, <code>get all</code></span><span class="ttag tt-lab">lab</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la diferencia entre Pod directo y Deployment</span><span class="ttag tt-theory">teoría</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Modificar el ConfigMap (texto, color) y aplicar con <code>kubectl apply</code></span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Recrear el Pod y verificar los cambios en el navegador</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar por qué con Deployment el restart es más fácil (<code>rollout restart</code>)</span><span class="ttag tt-theory">teoría</span></li>
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Limpiar con <code>kubectl delete namespace hello</code></span><span class="ttag tt-lab">lab</span></li>
         </ul>
       </div>

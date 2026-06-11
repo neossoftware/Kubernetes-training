@@ -129,7 +129,57 @@ kubectl get all -n hello
 
 ---
 
-## Step 7 — Limpiar
+---
+
+## Parte 2 — Modifica el ConfigMap y ve los cambios en vivo
+
+### Step 7 — Editar hello-configmap.yaml
+
+Cambia el título, el color de fondo o el badge en `hello-configmap.yaml`. Por ejemplo:
+
+```yaml
+# Cambia el gradiente de azul-morado a naranja-rojo
+background: linear-gradient(135deg, #f59e0b 0%, #dc2626 100%);
+
+# Cambia el texto
+<h1>☸ ¡Actualizado con ConfigMap!</h1>
+<p>El Pod fue recreado con la nueva configuración.</p>
+<div class="badge">nginx · Lab 2-3 · v2</div>
+```
+
+### Step 8 — Aplicar el ConfigMap actualizado
+
+```bash
+kubectl apply -f hello-configmap.yaml
+# configmap/hello-html configured  ← dice "configured", no "created"
+
+# Verifica que el cambio está en K8s
+kubectl describe configmap hello-html -n hello
+```
+
+> ⚠️ K8s sincroniza el volumen ~60s después, pero **nginx no recarga en caliente**.
+> Necesitas recrear el Pod para ver los cambios.
+
+### Step 9 — Recrear el Pod
+
+```bash
+# Borrar el Pod actual
+kubectl delete pod hello-pod -n hello
+
+# Crear de nuevo (tomará el ConfigMap actualizado)
+kubectl apply -f hello-app.yaml
+# pod/hello-pod created
+# service/hello-svc unchanged  ← el Service no necesita recrearse
+
+# Esperar que esté Running
+kubectl get pods -n hello -w
+```
+
+Recarga **http://localhost:30080** — deberías ver el nuevo texto y fondo naranja-rojo.
+
+---
+
+## Step 10 — Limpiar
 
 ```bash
 # Borra el namespace y TODO lo que contiene de una sola vez
