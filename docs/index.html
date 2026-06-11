@@ -4595,6 +4595,20 @@ docker start postgres-lab
 docker exec postgres-lab pg_isready -U admin -d labdb
 <span class="c"># localhost:5432 - accepting connections</span></pre>
           <div class="theory-body" style="margin-top:10px;">
+            <p><strong>Caso 2b — Puerto 5432 ya ocupado</strong>: si <code>docker start</code> falla con este error:</p>
+          </div>
+          <pre><span class="c"># Bind for 0.0.0.0:5432 failed: port is already allocated</span>
+
+<span class="c"># Busca qué contenedor tiene el puerto</span>
+docker ps | grep 5432
+<span class="c"># lab2-postgres   postgres:16-alpine   0.0.0.0:5432->5432/tcp  ← otro contenedor del curso</span>
+
+<span class="c"># Páralo y arranca el tuyo</span>
+docker stop lab2-postgres
+docker start postgres-lab
+docker exec postgres-lab pg_isready -U admin -d labdb
+<span class="c"># localhost:5432 - accepting connections</span></pre>
+          <div class="theory-body" style="margin-top:10px;">
             <p><strong>Caso 3 — No existe</strong> (no aparece en la lista): créalo desde cero. Asegúrate de incluir <strong>todos</strong> los flags — si faltan las variables de entorno PostgreSQL no puede inicializarse:</p>
           </div>
           <pre>docker run -d \
