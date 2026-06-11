@@ -294,14 +294,25 @@ code { font-family:var(--mono); font-size:12px; background:#f1f5f9; border:1px s
   .hero { padding:28px 16px; }
   .hero h1 { font-size:26px; }
   .hero-sub { font-size:14px; }
-  .main { padding:12px 10px; }
-  .module { padding:12px; }
+  .main { padding:12px 10px; overflow-x:hidden; }
+  .module { padding:12px; max-width:100%; overflow-x:hidden; }
   .phase-header { padding:14px 16px; }
 
-  /* Código — más pequeño y con scroll horizontal */
-  pre { font-size:10.5px; padding:10px 10px; line-height:1.5; border-radius:6px; }
-  code { font-size:10.5px; }
-  .file-tree { font-size:10.5px; padding:10px 12px; }
+  /* Código — más pequeño, contenido y con scroll horizontal */
+  pre {
+    font-size:9.5px;
+    padding:10px 10px;
+    line-height:1.5;
+    border-radius:6px;
+    max-width:calc(100vw - 32px);
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    white-space:pre;
+    word-break:normal;
+    word-wrap:normal;
+  }
+  code { font-size:10px; }
+  .file-tree { font-size:10px; padding:10px 12px; max-width:calc(100vw - 32px); overflow-x:auto; }
 
   /* Texto general de teoría */
   .theory-body { font-size:12.5px; }
