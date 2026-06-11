@@ -297,6 +297,37 @@ code { font-family:var(--mono); font-size:12px; background:#f1f5f9; border:1px s
   .module { padding:16px; }
   .phase-header { padding:14px 16px; }
 }
+
+/* ── K8S ARCHITECTURE DIAGRAM ── */
+.k8s-diagram { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:20px 20px 16px; margin:12px 0; overflow-x:auto; }
+.k8s-diagram-title { text-align:center; font-family:var(--sans); font-size:12px; font-weight:700; color:var(--muted); margin-bottom:14px; letter-spacing:1px; text-transform:uppercase; }
+.k8s-cluster { border:2.5px solid #3b82f6; border-radius:10px; padding:16px; background:#fff; position:relative; }
+.k8s-cluster-label { position:absolute; top:-12px; left:16px; background:#3b82f6; color:white; font-size:10px; font-weight:700; padding:2px 12px; border-radius:20px; font-family:var(--sans); letter-spacing:.8px; text-transform:uppercase; }
+.k8s-cp { border:2px solid #8b5cf6; border-radius:8px; background:#f5f3ff; padding:12px 14px; margin-bottom:14px; }
+.k8s-cp-label { font-family:var(--sans); font-size:11px; font-weight:700; color:#6d28d9; margin-bottom:10px; }
+.k8s-boxes { display:flex; flex-wrap:wrap; gap:7px; }
+.k8s-box { border-radius:6px; padding:5px 10px; font-family:var(--mono); font-size:10.5px; font-weight:600; text-align:center; }
+.k8s-box.api { background:#dbeafe; border:1.5px solid #93c5fd; color:#1e40af; }
+.k8s-box.etcd { background:#fce7f3; border:1.5px solid #f9a8d4; color:#9d174d; }
+.k8s-box.sched { background:#d1fae5; border:1.5px solid #6ee7b7; color:#065f46; }
+.k8s-box.ctrl { background:#fef3c7; border:1.5px solid #fcd34d; color:#92400e; }
+.k8s-box.ccm { background:#e0e7ff; border:1.5px solid #a5b4fc; color:#3730a3; }
+.k8s-nodes { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.k8s-node { border:2px solid #10b981; border-radius:8px; background:#f0fdf4; padding:10px 12px; }
+.k8s-node-label { font-family:var(--sans); font-size:10.5px; font-weight:700; color:#065f46; margin-bottom:8px; }
+.k8s-pods { display:flex; gap:5px; margin-bottom:7px; flex-wrap:wrap; }
+.k8s-pod { background:#bbf7d0; border:1.5px solid #6ee7b7; border-radius:5px; padding:3px 8px; font-family:var(--mono); font-size:9.5px; font-weight:600; color:#065f46; }
+.k8s-pod.grey { background:#e2e8f0; border-color:#cbd5e1; color:#64748b; }
+.k8s-node-agents { font-size:10px; color:#6b7280; font-family:var(--sans); }
+.k8s-kubectl-row { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:14px; }
+.k8s-kubectl-box { background:#0f172a; color:#f8fafc; border-radius:6px; padding:5px 14px; font-family:var(--mono); font-size:11px; font-weight:700; }
+.k8s-arrow-right { color:#64748b; font-size:20px; line-height:1; }
+.k8s-api-inline { background:#dbeafe; border:1.5px solid #93c5fd; color:#1e40af; border-radius:6px; padding:5px 12px; font-family:var(--mono); font-size:10.5px; font-weight:600; }
+.k8s-dd-box { background:#e0f2fe; border:1.5px solid #7dd3fc; border-radius:8px; padding:12px 16px; margin:10px 0; display:flex; gap:12px; align-items:flex-start; }
+.k8s-dd-icon { font-size:22px; line-height:1; flex-shrink:0; }
+.k8s-dd-content { font-size:13px; color:var(--text2); }
+.k8s-dd-content strong { color:#0369a1; }
+@media(max-width:640px){ .k8s-nodes { grid-template-columns:1fr; } .k8s-kubectl-row { flex-wrap:wrap; } }
 </style>
 </head>
 <body>
@@ -3007,10 +3038,90 @@ open http://localhost:8000/docs</pre>
           </div>
         </div>
 
+        <!-- Diagrama de Arquitectura -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Diagrama</span><span class="theory-title">Arquitectura de un Cluster Kubernetes</span></div>
+          <div class="theory-body">
+            <p>Este es el mapa mental que necesitas tener claro antes de empezar a trabajar con K8s. Cada componente tiene una responsabilidad única y bien definida.</p>
+
+            <div class="k8s-diagram">
+              <div class="k8s-diagram-title">Kubernetes Cluster — Vista General</div>
+
+              <!-- kubectl → API Server -->
+              <div class="k8s-kubectl-row">
+                <div class="k8s-kubectl-box">kubectl</div>
+                <div class="k8s-arrow-right">──────►</div>
+                <div class="k8s-api-inline">kube-apiserver</div>
+                <span style="font-size:11px;color:#64748b;font-family:var(--sans);">(único punto de entrada)</span>
+              </div>
+
+              <div class="k8s-cluster">
+                <div class="k8s-cluster-label">☸ Kubernetes Cluster</div>
+
+                <!-- Control Plane -->
+                <div class="k8s-cp">
+                  <div class="k8s-cp-label">🧠 Control Plane — el cerebro</div>
+                  <div class="k8s-boxes">
+                    <div class="k8s-box api">kube-apiserver<br><span style="font-size:9px;font-weight:400">REST API · punto de entrada</span></div>
+                    <div class="k8s-box etcd">etcd<br><span style="font-size:9px;font-weight:400">estado del cluster (DB)</span></div>
+                    <div class="k8s-box sched">kube-scheduler<br><span style="font-size:9px;font-weight:400">decide en qué nodo va cada Pod</span></div>
+                    <div class="k8s-box ctrl">controller-manager<br><span style="font-size:9px;font-weight:400">ReplicaSet · Node · Job</span></div>
+                    <div class="k8s-box ccm">cloud-controller-manager<br><span style="font-size:9px;font-weight:400">LoadBalancer en GCP/AWS</span></div>
+                  </div>
+                </div>
+
+                <!-- Worker Nodes -->
+                <div class="k8s-nodes">
+                  <div class="k8s-node">
+                    <div class="k8s-node-label">⚙️ Worker Node 1</div>
+                    <div class="k8s-pods">
+                      <div class="k8s-pod">Pod: nginx</div>
+                      <div class="k8s-pod">Pod: api</div>
+                      <div class="k8s-pod grey">Pod: api</div>
+                    </div>
+                    <div class="k8s-node-agents">kubelet · kube-proxy · containerd</div>
+                  </div>
+                  <div class="k8s-node">
+                    <div class="k8s-node-label">⚙️ Worker Node 2</div>
+                    <div class="k8s-pods">
+                      <div class="k8s-pod">Pod: api</div>
+                      <div class="k8s-pod">Pod: postgres</div>
+                    </div>
+                    <div class="k8s-node-agents">kubelet · kube-proxy · containerd</div>
+                  </div>
+                </div>
+              </div><!-- /k8s-cluster -->
+            </div><!-- /k8s-diagram -->
+
+            <table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px;">
+              <thead><tr style="background:#f1f5f9;"><th style="padding:6px 10px;text-align:left;font-weight:700;border-bottom:1px solid #e2e8f0;">Componente</th><th style="padding:6px 10px;text-align:left;font-weight:700;border-bottom:1px solid #e2e8f0;">Responsabilidad clave</th></tr></thead>
+              <tbody>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;"><code>kube-apiserver</code></td><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Todo pasa por aquí. Valida y persiste el estado en etcd.</td></tr>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;"><code>etcd</code></td><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Base de datos del cluster. Si se pierde sin backup → cluster muerto.</td></tr>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;"><code>kube-scheduler</code></td><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Decide <em>dónde</em> corre cada Pod según recursos y reglas.</td></tr>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;"><code>controller-manager</code></td><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Reconcilia estado deseado vs real. Si muere un Pod, lo recrea.</td></tr>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;"><code>kubelet</code></td><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Agente en cada nodo. Arranca y monitorea los containers.</td></tr>
+                <tr><td style="padding:5px 10px;"><code>kube-proxy</code></td><td style="padding:5px 10px;">Mantiene las reglas de red (iptables) para que los Services funcionen.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="theory-block">
           <div class="theory-header"><span class="theory-tag">Setup</span><span class="theory-title">Instalar minikube y kubectl</span></div>
           <div class="theory-body">
             <p><strong>minikube</strong> crea un cluster K8s de un solo nodo en tu máquina local para desarrollo y aprendizaje. <strong>kubectl</strong> es la CLI oficial de Kubernetes.</p>
+
+            <div class="k8s-dd-box">
+              <div class="k8s-dd-icon">🐳</div>
+              <div class="k8s-dd-content">
+                <strong>¿Ya tienes Docker Desktop?</strong> — Opción más rápida para macOS y Windows.<br>
+                Docker Desktop incluye Kubernetes integrado. Solo actívalo en <strong>Settings → Kubernetes → Enable Kubernetes</strong> y ya tienes un cluster listo sin instalar nada más.<br>
+                <span style="font-size:11.5px;color:#0369a1;margin-top:4px;display:block;">Después de activarlo: <code>kubectl get nodes</code> debería mostrar <code>docker-desktop</code> como nodo.</span>
+              </div>
+            </div>
+
+            <p style="margin-top:8px;">Si prefieres <strong>minikube</strong> (recomendado para Linux o para mayor control sobre la versión de K8s):</p>
           </div>
           <pre>
 <span class="c">## ── macOS ──────────────────────────────────</span>
@@ -3061,11 +3172,252 @@ minikube dashboard</pre>
         </ul>
       </div>
 
-      <!-- ─── 2.2 Objetos Core ─── -->
+      <!-- ─── 2.2 Lab 2-0: Hello World ─── -->
+      <div class="module">
+        <div class="mod-header">
+          <span class="mod-icon">👋</span>
+          <span class="mod-title">Lab 2-0 — Hello World en Kubernetes: tu primer Pod</span>
+          <span class="mod-duration">Semana 4 — Lab práctico introductorio</span>
+        </div>
+
+        <div class="lab-overview">
+          <div class="lab-overview-box lov-what">
+            <h4>¿Qué haremos?</h4>
+            <p>Desplegaremos un contenedor <strong>nginx</strong> que sirve una página "Hello from Kubernetes", lo expondremos con un <strong>Service</strong> y accederemos desde el navegador — todo con <code>kubectl</code> en minikube.</p>
+          </div>
+          <div class="lab-overview-box lov-goals">
+            <h4>Objetivos de aprendizaje</h4>
+            <ul>
+              <li>Crear y aplicar manifiestos YAML (Pod y Service)</li>
+              <li>Entender el flujo: <code>kubectl apply</code> → API Server → Scheduler → kubelet → container</li>
+              <li>Diferencia entre un Pod standalone y un Deployment</li>
+              <li>Exponer un servicio con <code>NodePort</code> y acceder con minikube</li>
+              <li>Comandos esenciales: <code>get</code>, <code>describe</code>, <code>logs</code>, <code>exec</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Pre-requisitos -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Pre</span><span class="theory-title">Requisitos</span></div>
+          <div class="theory-body">
+            <p>minikube o Docker Desktop con Kubernetes habilitado. Verifica que el cluster esté activo:</p>
+          </div>
+          <pre>kubectl get nodes
+<span class="c"># Esperado: NAME             STATUS   ROLES           AGE</span>
+<span class="c">#           minikube         Ready    control-plane   5m</span>
+<span class="c"># (o docker-desktop si usas Docker Desktop)</span></pre>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Crear el namespace del lab</span></div>
+          <div class="theory-body">
+            <p>Es buena práctica no trabajar en el namespace <code>default</code>. Creamos uno para este lab.</p>
+          </div>
+          <pre>kubectl create namespace hello
+<span class="c"># Verificar</span>
+kubectl get namespaces</pre>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Crear el ConfigMap con la página HTML</span></div>
+          <div class="theory-body">
+            <p>En lugar de construir una imagen custom, usamos un <strong>ConfigMap</strong> para inyectar el HTML en nginx. Así aprendemos dos objetos de K8s en un solo lab.</p>
+          </div>
+          <div class="filename">hello-configmap.yaml</div>
+          <pre><span class="k">apiVersion:</span> v1
+<span class="k">kind:</span> ConfigMap
+<span class="k">metadata:</span>
+  <span class="k">name:</span> hello-html
+  <span class="k">namespace:</span> hello
+<span class="k">data:</span>
+  <span class="k">index.html:</span> |
+    &lt;!DOCTYPE html&gt;
+    &lt;html&gt;
+    &lt;head&gt;
+      &lt;meta charset="utf-8"&gt;
+      &lt;title&gt;Hello Kubernetes!&lt;/title&gt;
+      &lt;style&gt;
+        body { font-family: sans-serif; display: flex; align-items: center;
+               justify-content: center; min-height: 100vh; margin: 0;
+               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card { background: white; padding: 40px 60px; border-radius: 16px;
+                text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+        h1 { color: #1e293b; font-size: 2.5rem; margin: 0 0 12px; }
+        p  { color: #64748b; font-size: 1.1rem; margin: 0; }
+        .badge { background: #3b82f6; color: white; padding: 4px 14px;
+                 border-radius: 20px; font-size: .9rem; margin-top: 16px;
+                 display: inline-block; }
+      &lt;/style&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+      &lt;div class="card"&gt;
+        &lt;h1&gt;&#9096; Hello from Kubernetes!&lt;/h1&gt;
+        &lt;p&gt;Tu primer Pod corriendo en el cluster.&lt;/p&gt;
+        &lt;div class="badge"&gt;nginx · Lab 2-0&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/body&gt;
+    &lt;/html&gt;</pre>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Crear el Pod y el Service en un solo archivo</span></div>
+          <div class="theory-body">
+            <p>En K8s puedes separar múltiples manifiestos en un archivo usando <code>---</code>. Creamos el Pod y su Service juntos. El Pod monta el ConfigMap como volumen en la carpeta que sirve nginx.</p>
+          </div>
+          <div class="filename">hello-app.yaml</div>
+          <pre><span class="c"># ── Pod ─────────────────────────────────────────</span>
+<span class="k">apiVersion:</span> v1
+<span class="k">kind:</span> Pod
+<span class="k">metadata:</span>
+  <span class="k">name:</span> hello-pod
+  <span class="k">namespace:</span> hello
+  <span class="k">labels:</span>
+    <span class="k">app:</span> hello          <span class="c"># el Service usa este label para encontrar el Pod</span>
+<span class="k">spec:</span>
+  <span class="k">containers:</span>
+    - <span class="k">name:</span> nginx
+      <span class="k">image:</span> nginx:1.27-alpine
+      <span class="k">ports:</span>
+        - <span class="k">containerPort:</span> 80
+      <span class="k">volumeMounts:</span>
+        - <span class="k">name:</span> html-vol
+          <span class="k">mountPath:</span> /usr/share/nginx/html   <span class="c"># reemplaza el HTML por defecto</span>
+  <span class="k">volumes:</span>
+    - <span class="k">name:</span> html-vol
+      <span class="k">configMap:</span>
+        <span class="k">name:</span> hello-html                    <span class="c"># apunta al ConfigMap del Step 2</span>
+---
+<span class="c"># ── Service ─────────────────────────────────────</span>
+<span class="k">apiVersion:</span> v1
+<span class="k">kind:</span> Service
+<span class="k">metadata:</span>
+  <span class="k">name:</span> hello-svc
+  <span class="k">namespace:</span> hello
+<span class="k">spec:</span>
+  <span class="k">selector:</span>
+    <span class="k">app:</span> hello            <span class="c"># conecta con los Pods que tengan este label</span>
+  <span class="k">type:</span> NodePort
+  <span class="k">ports:</span>
+    - <span class="k">port:</span> 80             <span class="c"># puerto dentro del cluster</span>
+      <span class="k">targetPort:</span> 80       <span class="c"># puerto del container</span>
+      <span class="k">nodePort:</span> 30080      <span class="c"># puerto expuesto en el nodo (30000-32767)</span></pre>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Aplicar los manifiestos</span></div>
+          <pre><span class="c"># Aplicar ConfigMap primero (el Pod lo necesita para arrancar)</span>
+kubectl apply -f hello-configmap.yaml
+kubectl apply -f hello-app.yaml
+
+<span class="c"># Verificar que el Pod esté Running</span>
+kubectl get pods -n hello
+<span class="c"># NAME        READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># hello-pod   1/1     Running   0          15s</span>
+
+<span class="c"># Verificar el Service</span>
+kubectl get svc -n hello
+<span class="c"># NAME        TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE</span>
+<span class="c"># hello-svc   NodePort   10.96.144.201   &lt;none&gt;        80:30080/TCP   15s</span></pre>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 5</span><span class="theory-title">Acceder desde el navegador</span></div>
+          <div class="theory-body">
+            <p>La forma de acceder depende de si usas <strong>minikube</strong> o <strong>Docker Desktop</strong>:</p>
+          </div>
+          <pre><span class="c">## ── Con minikube ────────────────────────────────</span>
+<span class="c"># Opción A: minikube service abre el navegador automáticamente</span>
+minikube service hello-svc -n hello
+
+<span class="c"># Opción B: obtener la URL y abrirla manualmente</span>
+minikube service hello-svc -n hello --url
+<span class="c"># http://127.0.0.1:XXXXX</span>
+
+<span class="c">## ── Con Docker Desktop ──────────────────────────</span>
+<span class="c"># NodePort es accesible directo en localhost</span>
+<span class="c"># Abrir en el navegador: http://localhost:30080</span>
+
+<span class="c">## ── Alternativa universal: port-forward ─────────</span>
+kubectl port-forward -n hello pod/hello-pod 8080:80
+<span class="c"># Abrir: http://localhost:8080</span></pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <p>Deberías ver la tarjeta <strong>"Hello from Kubernetes!"</strong> con fondo degradado azul-morado.</p>
+          </div>
+        </div>
+
+        <!-- Step 6: kubectl debug commands -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Comandos de diagnóstico esenciales</span></div>
+          <div class="theory-body">
+            <p>Estos son los comandos que más usarás para inspeccionar el estado de K8s. Practica todos:</p>
+          </div>
+          <pre><span class="c"># Descripción completa del Pod (eventos, volúmenes, estado)</span>
+kubectl describe pod hello-pod -n hello
+
+<span class="c"># Ver logs del container</span>
+kubectl logs hello-pod -n hello
+
+<span class="c"># Seguir logs en tiempo real</span>
+kubectl logs -f hello-pod -n hello
+
+<span class="c"># Entrar al container (como docker exec)</span>
+kubectl exec -it hello-pod -n hello -- sh
+
+<span class="c"># Ver todos los recursos del namespace de un vistazo</span>
+kubectl get all -n hello</pre>
+        </div>
+
+        <!-- Step 7: Cleanup -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 7</span><span class="theory-title">Limpiar el lab</span></div>
+          <pre><span class="c"># Eliminar todo el namespace (borra todos los recursos dentro)</span>
+kubectl delete namespace hello
+
+<span class="c"># Verificar que desapareció</span>
+kubectl get namespaces</pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <div class="step-ok">Si pudiste ver la página "Hello from Kubernetes!" en el navegador: entendiste el flujo completo de K8s — manifiesto YAML → API Server → Scheduler → kubelet → container en ejecución → Service expone el Puerto. Este es exactamente el mismo flujo que usarás para aplicaciones reales.</div>
+          </div>
+        </div>
+
+        <!-- Diferencia Pod vs Deployment -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Concepto</span><span class="theory-title">¿Por qué en producción NO se usan Pods directos?</span></div>
+          <div class="theory-body">
+            <p>En este lab creamos un Pod directamente. En producción eso es un antipatrón:</p>
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;">
+              <thead><tr style="background:#f1f5f9;"><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Pod directo</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Deployment (producción)</th></tr></thead>
+              <tbody>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Si el Pod muere, <strong>no se recupera</strong></td><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">El ReplicaSet recrea el Pod automáticamente</td></tr>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Una sola réplica, sin escalar</td><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Escalado con <code>kubectl scale --replicas=N</code></td></tr>
+                <tr><td style="padding:5px 10px;">Sin rolling updates</td><td style="padding:5px 10px;">Deploy sin downtime con <code>RollingUpdate</code></td></tr>
+              </tbody>
+            </table>
+            <p style="margin-top:8px;">El Lab 2-A (siguiente módulo) ya usa Deployments completos. Este lab fue intencionalmente simple para aprender el flujo fundamental.</p>
+          </div>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Verificar cluster activo con <code>kubectl get nodes</code></span><span class="ttag tt-setup">setup</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear namespace <code>hello</code> y aplicar los 2 manifiestos YAML</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ver la página "Hello from Kubernetes!" en el navegador</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Practicar: <code>describe</code>, <code>logs</code>, <code>exec</code>, <code>get all</code></span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la diferencia entre Pod directo y Deployment</span><span class="ttag tt-theory">teoría</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Limpiar con <code>kubectl delete namespace hello</code></span><span class="ttag tt-lab">lab</span></li>
+        </ul>
+      </div>
+
+      <!-- ─── 2.3 Objetos Core ─── -->
       <div class="module">
         <div class="mod-header">
           <span class="mod-icon">📦</span>
-          <span class="mod-title">2.2 — Pods, Deployments y Services</span>
+          <span class="mod-title">2.3 — Pods, Deployments y Services</span>
           <span class="mod-duration">Semana 4 — Teoría</span>
         </div>
 
@@ -3137,7 +3489,7 @@ minikube dashboard</pre>
       <div class="module">
         <div class="mod-header">
           <span class="mod-icon">🧪</span>
-          <span class="mod-title">2.3 — Lab 2-A: Spring Boot en Kubernetes — Deployment completo</span>
+          <span class="mod-title">2.4 — Lab 2-A: Spring Boot en Kubernetes — Deployment completo</span>
           <span class="mod-duration">Semana 4–5 — Lab completo</span>
         </div>
 
@@ -3544,7 +3896,7 @@ kubectl get hpa -n labs -w</pre>
       <div class="module">
         <div class="mod-header">
           <span class="mod-icon">🔧</span>
-          <span class="mod-title">2.4 — ConfigMaps, Secrets y StatefulSets</span>
+          <span class="mod-title">2.5 — ConfigMaps, Secrets y StatefulSets</span>
           <span class="mod-duration">Semana 5 — Teoría + Lab</span>
         </div>
 
