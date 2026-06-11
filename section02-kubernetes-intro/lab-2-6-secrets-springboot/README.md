@@ -56,7 +56,15 @@ docker ps -a | grep postgres-lab
 
 **Caso 1 — Está corriendo** (STATUS "Up"): no hay que hacer nada, continúa al Step 1.
 
-**Caso 2 — Existe pero está detenido** (STATUS "Exited"): solo arráncalo:
+**Caso 2 — Existe pero está detenido** (STATUS "Exited"): si intentas `docker run`
+verás este error:
+
+```
+Error: Conflict. The container name "/postgres-lab" is already in use...
+You have to remove (or rename) that container to be able to reuse that name.
+```
+
+Solución — no uses `docker run`, solo arráncalo:
 
 ```bash
 docker start postgres-lab
