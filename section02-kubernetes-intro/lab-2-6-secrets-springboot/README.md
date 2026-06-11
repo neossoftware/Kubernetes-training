@@ -115,9 +115,14 @@ La clave es `-p 5432:5432` — expone la BD al host para que los Pods de K8s pue
 
 ## Step 1 — Construir la imagen de la API
 
+El código está en `api/` dentro de este lab. El `application.properties` fue
+actualizado para leer variables de entorno **sin defaults** — si el Secret no
+está montado, la app falla al arrancar (CrashLoopBackOff), señal clara de que
+falta configuración.
+
 ```bash
-cd section01-docker/lab2-springboot-postgre-compose/products-api
-docker build -t lab2-6-products-api:1.0 .
+cd section02-kubernetes-intro/lab-2-6-secrets-springboot
+docker build -t lab2-6-products-api:1.0 ./api
 # (tarda ~2 min la primera vez — descarga dependencias Maven)
 
 docker images | grep lab2-6-products-api

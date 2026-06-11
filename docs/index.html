@@ -4629,10 +4629,13 @@ docker exec postgres-lab pg_isready -U admin -d labdb
         <!-- Step 2 -->
         <div class="theory-block">
           <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Construir la imagen de la API</span></div>
-          <div class="theory-body"><p>El código viene del Lab 1-B. La primera vez tarda ~2 min descargando dependencias Maven.</p></div>
+          <div class="theory-body">
+            <p>El código está en <code>api/</code> dentro de este lab. El <code>application.properties</code> fue actualizado para leer variables sin defaults — si el Secret no está montado, la app falla al arrancar con <strong>CrashLoopBackOff</strong>, señal clara de que falta configuración.</p>
+          </div>
           <pre><span class="c"># Desde la raíz del proyecto</span>
-cd section01-docker/lab2-springboot-postgre-compose/products-api
-docker build -t lab2-6-products-api:1.0 .
+cd section02-kubernetes-intro/lab-2-6-secrets-springboot
+docker build -t lab2-6-products-api:1.0 ./api
+<span class="c"># (tarda ~2 min la primera vez — descarga dependencias Maven)</span>
 
 docker images | grep lab2-6-products-api
 <span class="c"># lab2-6-products-api   1.0   ...</span></pre>
