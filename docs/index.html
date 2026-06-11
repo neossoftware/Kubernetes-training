@@ -3435,20 +3435,43 @@ kubectl get svc
 kubectl get endpointslices -l kubernetes.io/service-name=mi-nginx-svc
 <span class="c"># NAME                 ADDRESSTYPE   PORTS   ENDPOINTS    AGE</span>
 <span class="c"># mi-nginx-svc-xxxxx   IPv4          80      10.1.0.45    8s</span></pre>
+
+          <div class="theory-body" style="margin-top:10px;">
+            <p><strong>¿Qué significan esas IPs y columnas?</strong></p>
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:12px;">
+              <thead><tr style="background:#f1f5f9;"><th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Columna</th><th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Valor del ejemplo</th><th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Qué es</th></tr></thead>
+              <tbody>
+                <tr><td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;"><code>CLUSTER-IP</code></td><td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;"><code>10.96.58.12</code></td><td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">IP virtual <strong>interna</strong> del cluster. Solo otros Pods pueden usarla. Tú no puedes accederla desde tu máquina.</td></tr>
+                <tr><td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;"><code>EXTERNAL-IP</code></td><td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;"><code>&lt;none&gt;</code></td><td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">En NodePort siempre dice <code>&lt;none&gt;</code>. Solo aparece una IP aquí si usas tipo <code>LoadBalancer</code> en un cloud real (GCP, AWS).</td></tr>
+                <tr><td style="padding:6px 10px;"><code>PORT(S)</code></td><td style="padding:6px 10px;"><code>80:30090/TCP</code></td><td style="padding:6px 10px;"><code>80</code> = puerto interno del cluster · <code>30090</code> = puerto abierto en el nodo, accesible desde tu máquina.</td></tr>
+              </tbody>
+            </table>
+
+            <p><strong>¿Cómo llega el tráfico desde tu navegador hasta nginx?</strong></p>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;font-family:var(--mono);font-size:12px;line-height:2;margin-top:6px;">
+              <span style="color:#1d4ed8;font-weight:700;">Tu navegador</span> <span style="color:#64748b;">http://localhost:</span><span style="color:#dc2626;font-weight:700;">30090</span><br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ <span style="color:#64748b;font-family:var(--sans);font-size:11px;">nodePort — puerto abierto en el nodo (tu máquina)</span><br>
+              <span style="color:#7c3aed;font-weight:700;">Service mi-nginx-svc</span> <span style="color:#64748b;">ClusterIP 10.96.58.12:</span><span style="color:#059669;font-weight:700;">80</span><br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓ <span style="color:#64748b;font-family:var(--sans);font-size:11px;">selector app=mi-nginx → encuentra el Pod</span><br>
+              <span style="color:#059669;font-weight:700;">Pod mi-nginx</span> <span style="color:#64748b;">10.1.0.45:</span><span style="color:#059669;font-weight:700;">80</span> <span style="color:#64748b;font-family:var(--sans);font-size:11px;">← targetPort, el container nginx</span>
+            </div>
+            <p style="margin-top:8px;font-size:12.5px;color:var(--text2);">Docker Desktop es especial: mapea automáticamente los <code>nodePort</code> a <code>localhost</code>. Por eso funciona directo en el navegador. En minikube necesitas <code>minikube service</code> porque el nodo corre en una VM separada.</p>
+          </div>
         </div>
 
         <!-- Step 3 -->
         <div class="theory-block">
           <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Acceder desde el navegador</span></div>
           <pre><span class="c">## ── Docker Desktop ──────────────────────────────</span>
-<span class="c"># Abrir directamente en el navegador:</span>
-<span class="c"># http://localhost:30090</span>
+<span class="c"># nodePort 30090 se mapea automáticamente a localhost</span>
+<span class="c"># Abrir en el navegador: http://localhost:30090</span>
 
 <span class="c">## ── minikube ────────────────────────────────────</span>
 minikube service mi-nginx-svc --url
-<span class="c"># http://127.0.0.1:XXXXX  ← abrir esa URL</span></pre>
+<span class="c"># http://127.0.0.1:XXXXX  ← abrir esa URL</span>
+<span class="c"># (minikube corre en una VM, por eso necesita este comando)</span></pre>
           <div class="theory-body" style="margin-top:8px;">
-            <p>Deberías ver la página por defecto de nginx: <em>"Welcome to nginx!"</em> — esta vez sin port-forward, expuesto de forma permanente a través del Service.</p>
+            <p>Deberías ver: <em>"Welcome to nginx!"</em> — expuesto de forma permanente a través del Service, sin port-forward.</p>
           </div>
         </div>
 

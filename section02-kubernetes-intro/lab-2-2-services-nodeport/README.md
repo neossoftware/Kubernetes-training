@@ -54,6 +54,29 @@ kubectl get endpointslices -l kubernetes.io/service-name=mi-nginx-svc
 # mi-nginx-svc-xxxxx   IPv4          80      10.1.0.45      8s
 ```
 
+### ¿Qué significan esas IPs y columnas?
+
+| Columna | Valor | Qué es |
+|---------|-------|--------|
+| `CLUSTER-IP` | `10.96.58.12` | IP virtual **interna** del cluster. Solo otros Pods pueden usarla. Tú no puedes accederla desde tu máquina. |
+| `EXTERNAL-IP` | `<none>` | En NodePort siempre dice `<none>`. Solo aparece una IP aquí con tipo `LoadBalancer` en un cloud real (GCP/AWS). |
+| `PORT(S)` | `80:30090/TCP` | `80` = puerto interno del cluster · `30090` = puerto abierto en el nodo, accesible desde tu máquina. |
+
+### ¿Cómo llega el tráfico desde el navegador hasta nginx?
+
+```
+Tu navegador  →  http://localhost:30090
+                          ↓  nodePort (puerto abierto en el nodo / tu máquina)
+         Service mi-nginx-svc  (ClusterIP 10.96.58.12:80)
+                          ↓  selector app=mi-nginx → encuentra el Pod
+                 Pod mi-nginx  (10.1.0.45:80)  ← targetPort, el container nginx
+```
+
+> **Docker Desktop** mapea automáticamente los `nodePort` a `localhost`, por eso
+> funciona directo en el navegador sin configuración extra.
+> **minikube** corre en una VM separada — necesitas `minikube service mi-nginx-svc --url`
+> para obtener la URL correcta.
+
 ---
 
 ## Step 3 — Acceder desde el navegador
