@@ -4509,11 +4509,217 @@ kubectl delete -f nginx-configmap.yaml</pre>
         </ul>
       </div>
 
-      <!-- ─── LAB 2-6 FULLSTACK ─── -->
+      <!-- ─── LAB 2-6 SECRETS SPRING BOOT ─── -->
+      <div class="module">
+        <div class="mod-header">
+          <span class="mod-icon">🔐</span>
+          <span class="mod-title">Lab 2-6 — Secrets: Spring Boot API conectada a PostgreSQL externo</span>
+          <span class="mod-duration">Semana 3 — Lab completo</span>
+        </div>
+
+        <!-- Teoría: Secrets -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Qué es un Kubernetes Secret?</span></div>
+          <div class="theory-body">
+            <p>Un <strong>Secret</strong> es un objeto de K8s diseñado para almacenar datos sensibles: contraseñas, tokens, claves API. A diferencia de un ConfigMap, K8s trata los Secrets con más cuidado:</p>
+            <ul style="margin:10px 0 0 18px;line-height:1.9;">
+              <li>No se imprimen en logs ni en <code>kubectl describe pod</code></li>
+              <li>Se pueden cifrar en reposo si el clúster está configurado para eso</li>
+              <li>Se inyectan en los Pods como variables de entorno o volúmenes</li>
+            </ul>
+          </div>
+          <div style="background:#fef9c3;border:1.5px solid #fbbf24;border-radius:10px;padding:14px 18px;margin:12px 0;color:#713f12;">
+            <strong>⚠️ Importante:</strong> Los valores en el YAML de un Secret están en <strong>base64</strong> — eso es encoding, no cifrado. Cualquiera que lea el archivo puede decodificarlos con <code>base64 -d</code>. Para cifrado real en producción se usan herramientas como <em>Sealed Secrets</em> o la integración con un KMS (AWS KMS, HashiCorp Vault).
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;">
+            <div style="background:#f0fdf4;border:1.5px solid #4ade80;border-radius:10px;padding:16px;">
+              <div style="font-weight:700;color:#166534;margin-bottom:8px;">ConfigMap</div>
+              <div style="font-size:.9rem;color:#14532d;">Configuración no sensible<br>nginx.conf, variables de app<br>Visible en texto plano</div>
+            </div>
+            <div style="background:#fdf2f8;border:1.5px solid #e879f9;border-radius:10px;padding:16px;">
+              <div style="font-weight:700;color:#86198f;margin-bottom:8px;">Secret</div>
+              <div style="font-size:.9rem;color:#701a75;">Datos sensibles<br>passwords, tokens, claves<br>Base64 + acceso restringido</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Teoría: arquitectura -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Diagrama</span><span class="theory-title">BD externa al clúster — simulando una VM de producción</span></div>
+          <div class="theory-body">
+            <p>En producción real es muy común que la base de datos NO esté en Kubernetes — vive en una VM, en RDS, en un servidor dedicado. Este lab simula exactamente ese escenario: la BD corre en Docker en tu máquina, y los Pods de K8s se conectan a ella por red.</p>
+          </div>
+          <pre style="font-size:.82rem;line-height:1.7;">  Tu máquina (host)
+  │
+  ├── Docker: postgres-lab  ─── puerto 5432 expuesto al host
+  │     labdb / admin / ninja123
+  │
+  └── Kubernetes (Docker Desktop)
+        │
+        ├── Secret: db-secret
+        │     DB_USER=admin · DB_PASSWORD=ninja123 · DB_NAME=labdb
+        │
+        ├── products-api Deployment (3 réplicas)
+        │     cada Pod lee credenciales del Secret
+        │     conecta a host.docker.internal:5432
+        │
+        └── products-api-svc  NodePort 30092
+              curl http://localhost:30092/api/products</pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <p><strong>¿Por qué <code>host.docker.internal</code>?</strong> Los Pods de K8s en Docker Desktop corren dentro de una VM Linux. Para llegar a un proceso en tu Mac usan este nombre DNS especial que Docker Desktop resuelve automáticamente.</p>
+          </div>
+        </div>
+
+        <div class="lab-block">
+          <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-6 — Spring Boot Products API + Secret + BD externa</span></div>
+          <div class="lab-content">
+
+        <!-- Step 1 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Verificar que PostgreSQL está corriendo en Docker</span></div>
+          <div class="theory-body"><p>La BD del Lab 0.1 debe estar activa con puerto <code>5432</code> expuesto al host:</p></div>
+          <pre>docker ps | grep postgres-lab
+<span class="c"># CONTAINER ID   IMAGE              PORTS                    NAMES</span>
+<span class="c"># abc123         postgres:16-alpine  0.0.0.0:5432->5432/tcp   postgres-lab</span>
+
+<span class="c"># Si no está corriendo:</span>
+docker run -d \
+  --name postgres-lab \
+  -e POSTGRES_DB=labdb \
+  -e POSTGRES_USER=admin \
+  -e POSTGRES_PASSWORD=ninja123 \
+  -e PGDATA=/var/lib/postgresql/data/pgdata \
+  -v postgres-data:/var/lib/postgresql/data \
+  -p 5432:5432 \
+  postgres:16-alpine</pre>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Construir la imagen de la API</span></div>
+          <div class="theory-body"><p>El código viene del Lab 1-B. La primera vez tarda ~2 min descargando dependencias Maven.</p></div>
+          <pre><span class="c"># Desde la raíz del proyecto</span>
+cd section01-docker/lab2-springboot-postgre-compose/products-api
+docker build -t lab2-6-products-api:1.0 .
+
+docker images | grep lab2-6-products-api
+<span class="c"># lab2-6-products-api   1.0   ...</span></pre>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Crear el Secret con las credenciales de la BD</span></div>
+          <div class="theory-body">
+            <p>Los valores en el YAML están en base64. Para generarlos tú mismo:</p>
+          </div>
+          <pre><span class="c"># Cómo se generan los valores base64:</span>
+echo -n 'admin'   | base64   <span class="c"># → YWRtaW4=</span>
+echo -n 'ninja123'| base64   <span class="c"># → bmluamExMjM=</span>
+echo -n 'labdb'   | base64   <span class="c"># → bGFiZGI=</span>
+
+<span class="c"># Aplicar el Secret</span>
+cd section02-kubernetes-intro/lab-2-6-secrets-springboot
+kubectl apply -f k8s/secret.yaml
+<span class="c"># secret/db-secret created</span>
+
+<span class="c"># Verificar — los valores NO aparecen en texto plano</span>
+kubectl describe secret db-secret
+<span class="c"># DB_NAME:     6 bytes</span>
+<span class="c"># DB_PASSWORD: 8 bytes</span>
+<span class="c"># DB_USER:     5 bytes</span>
+
+<span class="c"># Para decodificar manualmente:</span>
+kubectl get secret db-secret -o jsonpath='{.data.DB_USER}' | base64 -d
+<span class="c"># admin</span></pre>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Desplegar la API (3 réplicas)</span></div>
+          <pre>kubectl apply -f k8s/api-deployment.yaml
+<span class="c"># deployment.apps/products-api created</span>
+<span class="c"># service/products-api-svc created</span>
+
+<span class="c"># Los pods tardan ~30s en Ready — Spring Boot arranca más lento que nginx</span>
+kubectl get pods -l app=products-api
+<span class="c"># NAME                            READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># products-api-xxxx-aaaaa         1/1     Running   0          35s</span>
+<span class="c"># products-api-xxxx-bbbbb         1/1     Running   0          35s</span>
+<span class="c"># products-api-xxxx-ccccc         1/1     Running   0          35s</span>
+
+<span class="c"># Confirmar conexión a la BD en los logs</span>
+kubectl logs -l app=products-api --tail=5
+<span class="c"># HikariPool-1 - Start completed.</span>
+<span class="c"># Tomcat started on port 8080</span></pre>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 5</span><span class="theory-title">Probar los endpoints con curl</span></div>
+          <pre><span class="c"># Health check</span>
+curl http://localhost:30092/api/products/health
+<span class="c"># {"status":"UP","products":"3"}</span>
+
+<span class="c"># Listar productos (datos cargados por data.sql del Lab 1-B)</span>
+curl http://localhost:30092/api/products
+<span class="c"># {"data":[{"id":1,"name":"Teclado Mecánico Cherry MX",...}],"total":3}</span>
+
+<span class="c"># Crear un producto nuevo</span>
+curl -X POST http://localhost:30092/api/products \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Webcam 4K","price":129.99,"stock":10,"description":"USB-C, 4K 30fps"}'
+<span class="c"># {"id":4,"name":"Webcam 4K",...}</span>
+
+<span class="c"># Verificar que persiste en la BD externa</span>
+curl http://localhost:30092/api/products
+<span class="c"># total: 4  ← guardado en postgres-lab (Docker, fuera del clúster)</span></pre>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Verificar que las 3 réplicas leen el mismo Secret</span></div>
+          <pre><span class="c"># Ver las variables de entorno resueltas en un Pod</span>
+kubectl exec -it \
+  $(kubectl get pod -l app=products-api -o name | head -1) \
+  -- env | grep DB_
+<span class="c"># DB_HOST=host.docker.internal</span>
+<span class="c"># DB_PORT=5432</span>
+<span class="c"># DB_USER=admin         ← inyectado desde db-secret</span>
+<span class="c"># DB_PASSWORD=ninja123  ← inyectado desde db-secret</span>
+<span class="c"># DB_NAME=labdb         ← inyectado desde db-secret</span>
+
+<span class="c"># Las 3 réplicas comparten la BD — el producto creado en el Step 5</span>
+<span class="c"># es visible desde cualquiera de los 3 pods</span></pre>
+        </div>
+
+        <!-- Step 7 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 7</span><span class="theory-title">Limpiar</span></div>
+          <pre>kubectl delete -f k8s/api-deployment.yaml
+kubectl delete -f k8s/secret.yaml
+
+kubectl get pods    <span class="c"># sin pods de products-api</span>
+kubectl get secrets <span class="c"># db-secret eliminado</span></pre>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Verificar que <code>postgres-lab</code> está corriendo con el puerto 5432 expuesto</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Construir la imagen <code>lab2-6-products-api:1.0</code> desde el código del Lab 1-B</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear el Secret con las credenciales y verificar que no aparece en texto plano</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Desplegar 3 réplicas y confirmar conexión a la BD en los logs</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Probar CRUD completo con curl desde <code>localhost:30092</code></span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la diferencia entre Secret y ConfigMap, y por qué base64 no es cifrado</span><span class="ttag tt-theory">teoría</span></li>
+        </ul>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── LAB 2-7 FULLSTACK ─── -->
       <div class="module">
         <div class="mod-header">
           <span class="mod-icon">🔗</span>
-          <span class="mod-title">Lab 2-6 — Fullstack en Kubernetes: Frontend + API con Services</span>
+          <span class="mod-title">Lab 2-7 — Fullstack en Kubernetes: Frontend + API con Services</span>
           <span class="mod-duration">Semana 3 — Lab completo</span>
         </div>
 
@@ -4571,7 +4777,7 @@ kubectl delete -f nginx-configmap.yaml</pre>
         </div>
 
         <div class="lab-block">
-          <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-6 — React + Node.js API fullstack en K8s</span></div>
+          <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-7 — React + Node.js API fullstack en K8s</span></div>
           <div class="lab-content">
 
         <!-- Step 1 -->
@@ -4581,7 +4787,7 @@ kubectl delete -f nginx-configmap.yaml</pre>
             <p>Las imágenes se construyen localmente. Docker Desktop comparte el daemon de Docker con K8s, así que con <code>imagePullPolicy: Never</code> K8s las usa directamente sin buscarlas en Docker Hub.</p>
           </div>
           <pre><span class="c"># Desde la carpeta del lab</span>
-cd section02-kubernetes-intro/lab-2-6-fullstack
+cd section02-kubernetes-intro/lab-2-7-fullstack
 
 <span class="c"># Imagen de la API (Node.js Express)</span>
 docker build -t lab2-6-api:1.0 ./api
