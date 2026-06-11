@@ -3172,6 +3172,114 @@ minikube dashboard</pre>
         </ul>
       </div>
 
+      <!-- ─── 2.2 Lab 2-Intro: Primer contacto ─── -->
+      <div class="module">
+        <div class="mod-header">
+          <span class="mod-icon">🚀</span>
+          <span class="mod-title">Lab 2-Intro — Primer contacto con Kubernetes</span>
+          <span class="mod-duration">Semana 4 — Lab de calentamiento</span>
+        </div>
+
+        <div class="lab-overview">
+          <div class="lab-overview-box lov-what">
+            <h4>¿Qué haremos?</h4>
+            <p>Con <strong>un solo comando</strong> levantaremos un Pod de nginx en Kubernetes y lo veremos corriendo en el navegador usando <strong>port-forward</strong>. Sin archivos YAML, sin namespaces, sin configuración extra.</p>
+          </div>
+          <div class="lab-overview-box lov-goals">
+            <h4>Objetivos de aprendizaje</h4>
+            <ul>
+              <li>Ejecutar tu primer <code>kubectl run</code></li>
+              <li>Verificar el estado de un Pod con <code>kubectl get pods</code></li>
+              <li>Acceder a un container con <code>kubectl port-forward</code></li>
+              <li>Eliminar un Pod con <code>kubectl delete pod</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Pre -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Pre</span><span class="theory-title">Requisito: cluster activo</span></div>
+          <pre><span class="c"># Verifica que tienes un nodo listo</span>
+kubectl get nodes
+<span class="c"># NAME             STATUS   ROLES           AGE</span>
+<span class="c"># minikube         Ready    control-plane   5m</span></pre>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Crear el Pod con un comando</span></div>
+          <div class="theory-body">
+            <p><code>kubectl run</code> es la forma imperativa de crear un Pod — sin YAML. Úsalo para pruebas rápidas.</p>
+          </div>
+          <pre>kubectl run mi-nginx --image=nginx:1.27-alpine</pre>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Verificar que el Pod está corriendo</span></div>
+          <pre><span class="c"># Listar todos los pods del namespace default</span>
+kubectl get pods
+<span class="c"># NAME       READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># mi-nginx   1/1     Running   0          10s</span>
+
+<span class="c"># Si ves ContainerCreating, espera unos segundos y repite el comando</span>
+<span class="c"># Kubernetes está descargando la imagen nginx:1.27-alpine</span></pre>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Exponer el Pod con port-forward</span></div>
+          <div class="theory-body">
+            <p><code>kubectl port-forward</code> crea un túnel temporal desde tu máquina al container. <strong>No es para producción</strong> — es la herramienta perfecta para desarrollo y debugging.</p>
+          </div>
+          <pre><span class="c"># Redirige el puerto 8080 de tu máquina al puerto 80 del Pod</span>
+kubectl port-forward pod/mi-nginx 8080:80
+<span class="c"># Forwarding from 127.0.0.1:8080 -&gt; 80</span>
+<span class="c"># Forwarding from [::1]:8080 -&gt; 80</span></pre>
+          <div class="theory-body" style="margin-top:8px;">
+            <p>Deja este comando corriendo y abre en el navegador: <strong>http://localhost:8080</strong></p>
+            <p>Deberías ver la página por defecto de nginx: <em>"Welcome to nginx!"</em></p>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Limpiar</span></div>
+          <div class="theory-body">
+            <p>Detén el port-forward con <code>Ctrl+C</code>, luego elimina el Pod:</p>
+          </div>
+          <pre><span class="c"># Ctrl+C para detener el port-forward, luego:</span>
+kubectl delete pod mi-nginx
+<span class="c"># pod "mi-nginx" deleted</span>
+
+<span class="c"># Verificar que ya no existe</span>
+kubectl get pods
+<span class="c"># No resources found in default namespace.</span></pre>
+        </div>
+
+        <!-- Concepto: port-forward vs Service -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Concepto</span><span class="theory-title">¿Cuándo usar port-forward vs un Service?</span></div>
+          <div class="theory-body">
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+              <thead><tr style="background:#f1f5f9;"><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">port-forward</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Service (NodePort / LoadBalancer)</th></tr></thead>
+              <tbody>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Túnel temporal, solo mientras el comando corre</td><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Acceso permanente, sobrevive reinicios</td></tr>
+                <tr><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Solo accesible desde tu máquina</td><td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;">Accesible desde la red o internet</td></tr>
+                <tr><td style="padding:5px 10px;">Ideal para debug y desarrollo</td><td style="padding:5px 10px;">Necesario en producción</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear el Pod con <code>kubectl run mi-nginx --image=nginx:1.27-alpine</code></span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Confirmar STATUS <code>Running</code> con <code>kubectl get pods</code></span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Ver la página de nginx en <code>http://localhost:8080</code> vía port-forward</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Eliminar el Pod y verificar que desapareció</span><span class="ttag tt-lab">lab</span></li>
+        </ul>
+      </div>
+
       <!-- ─── 2.2 Lab 2-0: Hello World ─── -->
       <div class="module">
         <div class="mod-header">
