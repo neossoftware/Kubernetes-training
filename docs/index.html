@@ -5316,13 +5316,18 @@ kubectl delete secret db-secret --ignore-not-found</pre>
 
         <!-- Step 2 -->
         <div class="theory-block">
-          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Construir imagen del API</span></div>
+          <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Verificar imagen del API (reutilizamos lab-2-7)</span></div>
+          <div class="theory-body">
+            <p>El API de este lab es exactamente el mismo del Lab 2-7 — Spring Boot con logs en todos los endpoints. No hace falta reconstruirlo, reutilizamos <code>lab2-7-products-api:v2</code> directamente.</p>
+          </div>
           <pre>cd section02-kubernetes-intro/lab-2-8-angular-springboot
 
-docker build -t lab2-8-products-api:1.0 ./api
+<span class="c"># Verificar que la imagen del lab anterior existe</span>
+docker images | grep lab2-7-products-api
+<span class="c"># lab2-7-products-api   v2   ...  ← ya construida en Lab 2-7</span>
 
-docker images | grep lab2-8-products-api
-<span class="c"># lab2-8-products-api   1.0   ...</span></pre>
+<span class="c"># Si no existe, constrúyela:</span>
+<span class="c"># docker build -t lab2-7-products-api:v2 ../lab-2-7-rollout-undo/api</span></pre>
         </div>
 
         <!-- Step 3 -->
@@ -5333,9 +5338,8 @@ docker images | grep lab2-8-products-api
           </div>
           <pre>docker build -t lab2-8-frontend:1.0 ./frontend
 
-docker images | grep lab2-8
-<span class="c"># lab2-8-frontend       1.0   ...</span>
-<span class="c"># lab2-8-products-api   1.0   ...</span></pre>
+docker images | grep lab2-8-frontend
+<span class="c"># lab2-8-frontend   1.0   ...</span></pre>
         </div>
 
         <!-- Step 4 -->

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: lab2-8-products-api:1.0
+          image: lab2-7-products-api:v2   # misma imagen del lab 2-7 (con logs)
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
