@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: products-api
+  namespace: labs
+  labels:
+    app: products-api
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: products-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # Máximo 1 pod extra durante update
+      maxUnavailable: 0  # 0 pods caídos durante update (zero-downtime)
+  template:
+    metadata:
+      labels:
+        app: products-api
+        version: v1
+    spec:
+      containers:
+        - name: api
+          image: TUUSUARIO/products-api:v1  # Reemplaza TUUSUARIO con tu Docker Hub username
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: spring-config
+          env:
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: pg-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pg-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          # startupProbe: para apps lentas en arrancar (Spring Boot tarda ~5-10s)
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            failureThreshold: 30  # 30 * 10s = 5 minutos máximo para arrancar
+            periodSeconds: 10
+          # livenessProbe: reinicia el pod si el app está en estado irrecuperable
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            failureThreshold: 3
+          # readinessProbe: quita el pod del LoadBalancer si no está listo
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            failureThreshold: 3
