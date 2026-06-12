@@ -5284,10 +5284,11 @@ server {
             <div style="font-weight:700;color:#1e40af;margin-bottom:10px;">📘 ¿Cómo decide nginx qué bloque aplicar?</div>
             <div style="font-size:.88rem;color:#1e3a8a;line-height:1.9;">
               nginx compara la URL de cada petición con los bloques <code>location</code> en orden de especificidad:<br><br>
-              <strong>GET /api/products</strong> → coincide con <code>location /api/</code> → nginx hace <code>proxy_pass</code> a Spring Boot<br>
-              <strong>GET /api/products/1</strong> → coincide con <code>location /api/</code> → proxy_pass a Spring Boot<br>
+              <strong>GET /api/products</strong> → coincide con <code>location /api/</code> → nginx reenvía a <code>http://api-svc:8080/api/products</code><br>
+              <strong>GET /api/products/1</strong> → coincide con <code>location /api/</code> → nginx reenvía a <code>http://api-svc:8080/api/products/1</code><br>
               <strong>GET /main-abc123.js</strong> → archivo existe en disco → nginx lo sirve directamente<br>
               <strong>GET /productos</strong> → archivo NO existe → <code>try_files</code> devuelve <code>index.html</code> → Angular routea<br><br>
+              <strong>La ruta se preserva completa</strong> — nginx no la corta ni la modifica. Spring Boot recibe exactamente la misma URL que el browser pidió, solo que llegó desde nginx en lugar del browser directamente.<br><br>
               El browser nunca sabe que <code>/api/*</code> va a otro servidor — desde su perspectiva todo responde desde <code>localhost:30093</code>.
             </div>
           </div>
