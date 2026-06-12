@@ -5381,6 +5381,33 @@ kubectl get service api-svc -o jsonpath='{.spec.type}'
           <div style="background:#fff1f2;border:1.5px solid #fb7185;border-radius:8px;padding:12px;margin:10px 0;font-size:.87rem;color:#9f1239;">
             🔒 <strong>Este es el comportamiento esperado.</strong> El API no debe ser accesible desde fuera. Solo los Pods dentro del clúster pueden comunicarse con él usando el nombre DNS <code>api-svc</code>.
           </div>
+
+          <!-- Explicación: por qué el frontend SÍ puede pero curl NO -->
+          <div style="background:#eff6ff;border:1.5px solid #3b82f6;border-radius:10px;padding:18px;margin:14px 0;">
+            <div style="font-weight:700;color:#1e40af;margin-bottom:12px;">📘 ¿Por qué el frontend SÍ puede acceder al API pero tu curl NO?</div>
+            <p style="font-size:.88rem;color:#1e3a8a;margin:0 0 14px 0;">La clave está en <strong>desde dónde</strong> se hace cada llamada:</p>
+            <pre style="background:#dbeafe;border-radius:6px;padding:12px;font-size:.82rem;color:#1e3a8a;margin:0 0 12px 0;">Tu Mac (fuera del clúster)
+│
+│  curl http://localhost:8080      ← FALLA — no hay NodePort para el API
+│  curl http://10.104.x.x:8080    ← FALLA — ClusterIP no es enrutable desde tu Mac
+│
+│  Browser → http://localhost:30093  ← FUNCIONA — NodePort del frontend
+│                │
+└────────────────┼──────────────────────────────────────
+                 │    Docker Desktop VM (red del clúster)
+                 ▼
+         Pod nginx (frontend)
+                 │
+                 │  proxy_pass http://api-svc:8080  ← FUNCIONA — nginx está
+                 │                                    DENTRO de la red del clúster
+                 ▼
+         ClusterIP api-svc → Pod Spring Boot</pre>
+            <div style="font-size:.88rem;color:#1e3a8a;line-height:1.8;">
+              <strong>El ClusterIP</strong> (<code>10.104.x.x</code>) es una IP virtual que <em>solo existe dentro de la VM de Docker Desktop</em>. Tu Mac no tiene ninguna ruta hacia esa red — es como intentar acceder a una IP de una red privada de otra empresa.<br><br>
+              <strong>nginx corre dentro del clúster</strong>, en la misma red que el API. Cuando el browser pide <code>/api/products</code>, nginx (no el browser) hace la llamada a <code>api-svc:8080</code>. El browser nunca ve esa IP — solo recibe la respuesta que nginx le devuelve.<br><br>
+              <strong>Resumen:</strong> el frontend actúa como intermediario (<em>proxy</em>). El browser habla con nginx, nginx habla con el API. Esa separación es exactamente la seguridad que buscamos.
+            </div>
+          </div>
         </div>
 
         <!-- Step 6 -->
