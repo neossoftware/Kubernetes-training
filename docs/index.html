@@ -5308,6 +5308,50 @@ server {
               <code>location /api/</code> tiene <strong>prioridad</strong> sobre <code>location /</code> — nginx nunca llega al bloque de Angular para esas rutas. La app Angular solo toma el control cuando la URL <em>no</em> empieza por <code>/api/</code> y el archivo no existe en disco.
             </div>
           </div>
+
+          <!-- De dónde viene /api/products en el código Angular -->
+          <div style="background:#faf5ff;border:1.5px solid #a78bfa;border-radius:10px;padding:16px;margin:12px 0;">
+            <div style="font-weight:700;color:#6d28d9;margin-bottom:10px;">🅰️ ¿En qué parte del código Angular está declarado <code>/api/products</code>?</div>
+            <div style="font-size:.88rem;color:#4c1d95;line-height:1.8;margin-bottom:10px;">
+              En <code>product.service.ts</code> — el servicio que hace todas las llamadas HTTP:
+            </div>
+            <pre style="background:#ede9fe;border-radius:6px;padding:12px;font-size:.82rem;color:#4c1d95;margin:0 0 12px 0;"><span class="c">// product.service.ts</span>
+<span class="c">// Línea 9 — lee API_URL del env.js en runtime</span>
+private apiUrl = (window as any).__env?.API_URL ?? 'http://localhost:8080';
+
+<span class="c">// Línea 15 — construye la URL concatenando apiUrl + la ruta</span>
+this.http.get(`${this.apiUrl}/api/products`);</pre>
+            <div style="font-size:.88rem;color:#4c1d95;line-height:1.8;">
+              <strong>¿Qué valor toma <code>apiUrl</code>?</strong> Depende del entorno:<br><br>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+              <thead>
+                <tr style="background:#ddd6fe;">
+                  <th style="padding:7px 12px;text-align:left;color:#4c1d95;border-bottom:2px solid #a78bfa;">Entorno</th>
+                  <th style="padding:7px 12px;text-align:left;color:#4c1d95;border-bottom:2px solid #a78bfa;"><code>API_URL</code> en env.js</th>
+                  <th style="padding:7px 12px;text-align:left;color:#4c1d95;border-bottom:2px solid #a78bfa;">URL que construye Angular</th>
+                  <th style="padding:7px 12px;text-align:left;color:#4c1d95;border-bottom:2px solid #a78bfa;">Quién responde</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid #ede9fe;">
+                  <td style="padding:7px 12px;color:#4c1d95;">Docker (dev)</td>
+                  <td style="padding:7px 12px;"><code>'http://localhost:8080'</code></td>
+                  <td style="padding:7px 12px;"><code>http://localhost:8080/api/products</code></td>
+                  <td style="padding:7px 12px;color:#4c1d95;">Spring Boot directo</td>
+                </tr>
+                <tr>
+                  <td style="padding:7px 12px;color:#4c1d95;">Kubernetes</td>
+                  <td style="padding:7px 12px;"><code>''</code> (vacío)</td>
+                  <td style="padding:7px 12px;"><code>/api/products</code> (relativa)</td>
+                  <td style="padding:7px 12px;color:#4c1d95;">nginx → proxy → Spring Boot</td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="font-size:.84rem;color:#6d28d9;margin-top:10px;">
+              Cuando <code>API_URL</code> está vacío, <code>'' + '/api/products'</code> = <code>'/api/products'</code> — una URL <strong>relativa</strong>. El browser la resuelve contra el mismo servidor que sirve la app (<code>localhost:30093</code>), esa petición llega a nginx, y nginx la enruta a Spring Boot internamente.
+            </div>
+          </div>
         </div>
 
         <!-- DIAGRAMA DE ARQUITECTURA -->
