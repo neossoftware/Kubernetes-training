@@ -5292,6 +5292,22 @@ server {
               El browser nunca sabe que <code>/api/*</code> va a otro servidor — desde su perspectiva todo responde desde <code>localhost:30093</code>.
             </div>
           </div>
+
+          <div style="background:#f0fdf4;border:1.5px solid #4ade80;border-radius:10px;padding:16px;margin:12px 0;">
+            <div style="font-weight:700;color:#166534;margin-bottom:10px;">🧪 ¿Qué pasa si abres http://localhost:30093/api/products en el browser?</div>
+            <div style="font-size:.88rem;color:#14532d;line-height:1.8;">
+              Obtienes el JSON directamente — la lista de productos de Spring Boot. <strong>Angular no interviene en ningún momento.</strong><br><br>
+              El flujo es:
+              <ol style="margin:8px 0 8px 16px;padding:0;">
+                <li>Browser pide <code>GET /api/products</code></li>
+                <li>nginx intercepta: coincide con <code>location /api/</code></li>
+                <li>nginx reenvía a <code>http://api-svc:8080/api/products</code></li>
+                <li>Spring Boot responde con el JSON</li>
+                <li>nginx devuelve el JSON al browser</li>
+              </ol>
+              <code>location /api/</code> tiene <strong>prioridad</strong> sobre <code>location /</code> — nginx nunca llega al bloque de Angular para esas rutas. La app Angular solo toma el control cuando la URL <em>no</em> empieza por <code>/api/</code> y el archivo no existe en disco.
+            </div>
+          </div>
         </div>
 
         <!-- DIAGRAMA DE ARQUITECTURA -->
