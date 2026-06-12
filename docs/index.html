@@ -5255,6 +5255,44 @@ kubectl delete -f k8s/secret.yaml</pre>
           </div>
         </div>
 
+        <!-- TEORÍA: nginx.conf explicado -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Cómo funciona el nginx.conf del frontend?</span></div>
+          <div class="theory-body">
+            <p>El contenedor del frontend corre nginx con dos responsabilidades: <strong>servir la app Angular</strong> y <strong>hacer de proxy hacia el API interno</strong>. Esto se controla con el archivo <code>nginx.conf</code>:</p>
+          </div>
+          <pre><span class="c"># nginx.conf del frontend — Lab 2-8</span>
+server {
+    listen 80;
+
+    <span class="c"># BLOQUE 1 — Proxy hacia el API (ClusterIP, solo interno)</span>
+    <span class="c"># Cualquier petición que empiece por /api/ va al Service de Spring Boot</span>
+    location /api/ {
+        proxy_pass       http://api-svc:8080;  <span class="c"># K8s DNS resuelve api-svc al ClusterIP</span>
+        proxy_set_header Host $host;            <span class="c"># reenvía la cabecera Host original</span>
+        proxy_set_header X-Real-IP $remote_addr;<span class="c"># reenvía la IP del browser</span>
+    }
+
+    <span class="c"># BLOQUE 2 — SPA Angular: rutas del frontend → index.html</span>
+    <span class="c"># Si el archivo no existe en disco (ej: /productos, /detalle/1)</span>
+    <span class="c"># nginx devuelve index.html y Angular toma el control del routing</span>
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}</pre>
+          <div style="background:#eff6ff;border:1.5px solid #3b82f6;border-radius:10px;padding:16px;margin:12px 0;">
+            <div style="font-weight:700;color:#1e40af;margin-bottom:10px;">📘 ¿Cómo decide nginx qué bloque aplicar?</div>
+            <div style="font-size:.88rem;color:#1e3a8a;line-height:1.9;">
+              nginx compara la URL de cada petición con los bloques <code>location</code> en orden de especificidad:<br><br>
+              <strong>GET /api/products</strong> → coincide con <code>location /api/</code> → nginx hace <code>proxy_pass</code> a Spring Boot<br>
+              <strong>GET /api/products/1</strong> → coincide con <code>location /api/</code> → proxy_pass a Spring Boot<br>
+              <strong>GET /main-abc123.js</strong> → archivo existe en disco → nginx lo sirve directamente<br>
+              <strong>GET /productos</strong> → archivo NO existe → <code>try_files</code> devuelve <code>index.html</code> → Angular routea<br><br>
+              El browser nunca sabe que <code>/api/*</code> va a otro servidor — desde su perspectiva todo responde desde <code>localhost:30093</code>.
+            </div>
+          </div>
+        </div>
+
         <!-- DIAGRAMA DE ARQUITECTURA -->
         <div class="theory-block">
           <div class="theory-header"><span class="theory-tag">Diagrama</span><span class="theory-title">Arquitectura del lab — flujo completo</span></div>
