@@ -5253,6 +5253,27 @@ kubectl delete -f k8s/secret.yaml</pre>
           <div class="theory-body">
             <p><code>env.js</code> se sirve con cabecera <code>Cache-Control: no-cache</code> — el browser siempre lo descarga fresco. En K8s se puede montar como ConfigMap para cambiar la config sin reconstruir la imagen.</p>
           </div>
+
+          <!-- Por qué está vacío en K8s -->
+          <div style="background:#faf5ff;border:1.5px solid #a78bfa;border-radius:10px;padding:16px;margin:12px 0;">
+            <div style="font-weight:700;color:#6d28d9;margin-bottom:10px;">🅰️ ¿Por qué <code>API_URL</code> está vacío en K8s y en Docker tiene una URL?</div>
+            <div style="font-size:.88rem;color:#4c1d95;line-height:1.8;">
+              Porque en cada entorno el API es accesible de forma diferente:<br><br>
+              <strong>En Docker</strong> — el <code>docker-compose.yml</code> mapea el puerto <code>8080:8080</code>, entonces el browser puede llamar directamente a <code>http://localhost:8080</code>. El API está expuesto en tu máquina.<br><br>
+              <strong>En Kubernetes</strong> — el API es <code>ClusterIP</code>. No tiene ningún puerto expuesto en tu máquina. El browser <em>no puede llegar a él directamente</em>. Por eso <code>API_URL</code> se deja vacío: Angular construye URLs relativas (<code>/api/products</code>) que nginx intercepta y reenvía internamente al API.<br><br>
+              <strong>El resultado en el código Angular:</strong>
+            </div>
+            <pre style="background:#ede9fe;border-radius:6px;padding:12px;font-size:.82rem;color:#4c1d95;margin:8px 0;">private apiUrl = (window as any).__env?.API_URL ?? 'http://localhost:8080';
+
+<span class="c">// Docker:     apiUrl = 'http://localhost:8080'</span>
+<span class="c">//             GET http://localhost:8080/api/products  ← browser llama directo al API</span>
+
+<span class="c">// Kubernetes: apiUrl = ''  (vacío)</span>
+<span class="c">//             GET /api/products  ← URL relativa, nginx la intercepta y hace el proxy</span></pre>
+            <div style="font-size:.84rem;color:#6d28d9;margin-top:4px;">
+              El código Angular es <strong>idéntico</strong> en los dos entornos. Solo cambia el <code>env.js</code> — ese es el único punto de adaptación entre Docker y Kubernetes.
+            </div>
+          </div>
         </div>
 
         <!-- TEORÍA: nginx.conf explicado -->
