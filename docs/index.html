@@ -5703,10 +5703,408 @@ kubectl get services <span class="c"># solo "kubernetes"</span></pre>
         </div>
       </div>
 
+      <!-- ─── LAB 2-9 VOLUMES POSTGRES ─── -->
+      <div class="module">
+        <div class="mod-header" onclick="toggleModule(this)">
+          <span class="mod-icon">&#128200;</span>
+          <span class="mod-title">2.3 — Lab 2-9: Volúmenes y almacenamiento persistente con PostgreSQL</span>
+          <span class="mod-duration">Semana 3–4 — 2 partes</span>
+        </div>
+        <div class="mod-body">
+
+          <!-- OBJETIVOS -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Objetivos</span><span class="theory-title">¿Qué vas a aprender en este lab?</span></div>
+            <div class="theory-body">
+              <ul style="margin:0 0 0 18px;padding:0;line-height:2;">
+                <li>Entender por qué los datos dentro de un Pod son <strong>efímeros</strong> — mueren con el contenedor</li>
+                <li>Demostrar en vivo la pérdida de datos al reiniciar un Pod <strong>sin volumen</strong></li>
+                <li>Crear un <code>PersistentVolumeClaim</code> y montarlo en PostgreSQL</li>
+                <li>Verificar que los datos <strong>sobreviven</strong> al reinicio del Pod con PVC</li>
+                <li>Entender el flujo PVC → PV → StorageClass y qué hace cada pieza</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- TEORÍA: tipos de almacenamiento -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">¿Dónde viven los datos en Kubernetes?</span></div>
+            <div class="theory-body">
+              <p>En Docker, los contenedores tienen un sistema de archivos efímero. K8s hereda eso y agrega abstracciones para el almacenamiento persistente. Hay tres niveles:</p>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:.85rem;margin:8px 0;">
+              <thead>
+                <tr style="background:#1e293b;color:#e2e8f0;">
+                  <th style="padding:9px 14px;text-align:left;">Tipo</th>
+                  <th style="padding:9px 14px;text-align:left;">Alcance</th>
+                  <th style="padding:9px 14px;text-align:left;">¿Sobrevive al Pod?</th>
+                  <th style="padding:9px 14px;text-align:left;">Uso típico</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                  <td style="padding:8px 14px;font-weight:600;color:#dc2626;">Almacenamiento del contenedor</td>
+                  <td style="padding:8px 14px;">Solo ese contenedor</td>
+                  <td style="padding:8px 14px;color:#dc2626;font-weight:700;">No ✗</td>
+                  <td style="padding:8px 14px;">Nada crítico</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#fff;">
+                  <td style="padding:8px 14px;font-weight:600;color:#d97706;"><code>emptyDir</code></td>
+                  <td style="padding:8px 14px;">Todos los contenedores del Pod</td>
+                  <td style="padding:8px 14px;color:#d97706;font-weight:700;">No ✗</td>
+                  <td style="padding:8px 14px;">Caché temporal, sidecars</td>
+                </tr>
+                <tr style="background:#f0fdf4;">
+                  <td style="padding:8px 14px;font-weight:600;color:#16a34a;"><code>PersistentVolume</code></td>
+                  <td style="padding:8px 14px;">Independiente del Pod</td>
+                  <td style="padding:8px 14px;color:#16a34a;font-weight:700;">Sí ✓</td>
+                  <td style="padding:8px 14px;">Bases de datos, archivos</td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:14px;margin:12px 0;">
+              <div style="font-weight:700;color:#92400e;margin-bottom:6px;">&#9888; Por qué importa esto</div>
+              <div style="font-size:.87rem;color:#78350f;line-height:1.8;">
+                Un Pod puede reiniciarse por múltiples razones: un nodo se cae, un rolling update, OOM killer, un crash de la app. Si la BD corre sin PVC y el Pod reinicia, <strong>todos los datos se pierden</strong> — incluyendo los de producción. Este lab muestra ese momento exacto.
+              </div>
+            </div>
+          </div>
+
+          <!-- TEORÍA: PVC/PV/StorageClass -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">PVC, PV y StorageClass — cómo se conectan</span></div>
+            <div class="theory-body">
+              <p>El almacenamiento persistente en K8s tiene tres capas. Como alumno solo interactúas con el PVC — las demás capas son infraestructura:</p>
+            </div>
+            <pre style="font-size:.82rem;line-height:2;">Tu YAML                           K8s internamente
+
+PersistentVolumeClaim (PVC)
+  name: postgres-pvc
+  storage: 1Gi          ---->   PersistentVolume (PV)
+  accessModes: RWO               (creado automaticamente por StorageClass)
+                                  |
+                                  v
+                                StorageClass: hostpath
+                                  (en Docker Desktop: directorio en el nodo)
+                                  (en AWS: EBS volume)
+                                  (en GCP: Persistent Disk)</pre>
+            <div style="background:#eff6ff;border:1.5px solid #3b82f6;border-radius:10px;padding:14px;margin:12px 0;">
+              <div style="font-weight:700;color:#1e40af;margin-bottom:8px;">&#128214; Estados del PVC</div>
+              <div style="font-size:.87rem;color:#1e3a8a;line-height:1.9;">
+                <strong>Pending</strong> — K8s busca un PV disponible que cumpla los requisitos<br>
+                <strong>Bound</strong> — PVC ligado a un PV ✓ el Pod puede montarlo<br>
+                <strong>Lost</strong> — el PV subyacente desapareció (disco eliminado manualmente)
+              </div>
+            </div>
+            <div style="background:#faf5ff;border:1.5px solid #a78bfa;border-radius:10px;padding:14px;margin:12px 0;">
+              <div style="font-weight:700;color:#6d28d9;margin-bottom:8px;">&#128276; Sobre <code>PGDATA</code></div>
+              <div style="font-size:.87rem;color:#4c1d95;line-height:1.8;">
+                PostgreSQL requiere que su directorio de datos sea propiedad de <code>postgres</code>. Cuando usas un PVC con <code>hostpath</code>, el directorio raíz del mount puede tener permisos del sistema. La solución es apuntar <code>PGDATA</code> a un <em>subdirectorio</em> dentro del mount:
+              </div>
+              <pre style="background:#ede9fe;border-radius:6px;padding:10px;font-size:.82rem;color:#4c1d95;margin:8px 0 0 0;">env:
+  - name: PGDATA
+    value: /var/lib/postgresql/data/pgdata   <span class="c"># subdirectorio seguro</span>
+volumeMounts:
+  - mountPath: /var/lib/postgresql/data</pre>
+            </div>
+          </div>
+
+          <!-- DIAGRAMA VISUAL -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Diagrama</span><span class="theory-title">Parte 1 vs Parte 2 — el contraste visual</span></div>
+            <pre style="font-size:.81rem;line-height:1.9;">PARTE 1 — Sin volumen                 PARTE 2 — Con PVC
+
+  postgres Pod                            postgres Pod
+  +-----------------------+               +------------------------+
+  | /var/lib/postgresql/  |               | /var/lib/postgresql/   |
+  |   data  (efimero)     |               |   data                 |
+  |   tabla: productos    |               |      |                  |
+  +-----------------------+               +------+------ -----------+
+          |                                      |
+  kubectl delete pod                     PersistentVolumeClaim
+          |                                      |
+  [datos perdidos]               +--------------+--------------+
+          |                      | PersistentVolume (hostpath) |
+  nuevo Pod vacio                | tabla: productos            |
+                                 +----------------------------+
+                                        |
+                                 kubectl delete pod
+                                        |
+                                 nuevo Pod monta mismo PVC
+                                        |
+                                 [datos sobreviven]</pre>
+          </div>
+
+          <!-- PARTE 1 -->
+          <div style="background:#fef2f2;border:2px solid #ef4444;border-radius:12px;padding:16px;margin:16px 0;">
+            <div style="font-weight:700;font-size:1rem;color:#b91c1c;margin-bottom:4px;">&#128308; PARTE 1 — El problema: datos que desaparecen</div>
+            <div style="font-size:.87rem;color:#7f1d1d;">PostgreSQL sin volumen — los datos mueren con el Pod</div>
+          </div>
+
+          <div class="lab-block">
+            <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-9 Parte 1 — PostgreSQL sin volumen</span></div>
+            <div class="lab-content">
+
+          <!-- Step 1 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Desplegar namespace, secret y PostgreSQL sin volumen</span></div>
+            <pre>cd section02-kubernetes-intro/lab-2-9-volumes-postgres
+
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/part1-postgres-no-volume.yaml
+<span class="c"># deployment.apps/postgres created</span>
+<span class="c"># service/postgres-svc created</span>
+
+kubectl get pods -n lab2-9 -w
+<span class="c"># NAME                       READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># postgres-xxxx-aaaaa        1/1     Running   0          15s</span></pre>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Insertar datos en PostgreSQL</span></div>
+            <div class="theory-body"><p>Conectamos directamente al Pod con <code>psql</code> — sin necesidad de exponer un puerto externo:</p></div>
+            <pre><span class="c"># Conectar a psql dentro del Pod</span>
+kubectl exec -it deployment/postgres -n lab2-9 -- psql -U admin -d labdb</pre>
+            <pre style="background:#1a1a2e;color:#e2e8f0;border-radius:8px;padding:14px;font-size:.82rem;line-height:1.8;"><span style="color:#a78bfa;">labdb=#</span> CREATE TABLE productos (
+          id     SERIAL PRIMARY KEY,
+          nombre VARCHAR(100),
+          precio DECIMAL(10,2)
+        );
+<span style="color:#4ade80;">CREATE TABLE</span>
+
+<span style="color:#a78bfa;">labdb=#</span> INSERT INTO productos (nombre, precio) VALUES ('Teclado Mecanico', 89.99);
+<span style="color:#a78bfa;">labdb=#</span> INSERT INTO productos (nombre, precio) VALUES ('Mouse Logitech',   45.00);
+<span style="color:#a78bfa;">labdb=#</span> INSERT INTO productos (nombre, precio) VALUES ('Monitor 4K',      349.00);
+<span style="color:#4ade80;">INSERT 0 1</span>
+
+<span style="color:#a78bfa;">labdb=#</span> SELECT * FROM productos;
+<span style="color:#94a3b8;"> id |     nombre       | precio
+----+------------------+--------
+  1 | Teclado Mecanico |  89.99
+  2 | Mouse Logitech   |  45.00
+  3 | Monitor 4K       | 349.00
+(3 rows)</span>
+
+<span style="color:#a78bfa;">labdb=#</span> \q</pre>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Eliminar el Pod y observar el ciclo de vida</span></div>
+            <div class="theory-body"><p>El Deployment tiene un ReplicaSet que detecta la falta del Pod y levanta uno nuevo automáticamente:</p></div>
+            <pre><span class="c"># Eliminar el Pod por su label</span>
+kubectl delete pod -l app=postgres -n lab2-9
+
+<span class="c"># En otra terminal, observar cómo K8s crea un Pod nuevo</span>
+kubectl get pods -n lab2-9 -w
+<span class="c"># NAME                    READY   STATUS        RESTARTS   AGE</span>
+<span class="c"># postgres-xxxx-aaaaa     Terminating                      45s</span>
+<span class="c"># postgres-xxxx-bbbbb     ContainerCreating                3s</span>
+<span class="c"># postgres-xxxx-bbbbb     1/1     Running       0          9s</span></pre>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Verificar que los datos desaparecieron</span></div>
+            <pre><span class="c"># Conectar al NUEVO Pod</span>
+kubectl exec -it deployment/postgres -n lab2-9 -- psql -U admin -d labdb</pre>
+            <pre style="background:#1a1a2e;color:#e2e8f0;border-radius:8px;padding:14px;font-size:.82rem;line-height:1.8;"><span style="color:#a78bfa;">labdb=#</span> SELECT * FROM productos;
+<span style="color:#f87171;">ERROR:  relation "productos" does not exist</span>
+
+<span style="color:#a78bfa;">labdb=#</span> \q</pre>
+            <div style="background:#fef2f2;border:1.5px solid #ef4444;border-radius:10px;padding:14px;margin:10px 0;">
+              <div style="font-weight:700;color:#b91c1c;margin-bottom:6px;">&#128308; Los datos están perdidos</div>
+              <div style="font-size:.87rem;color:#7f1d1d;line-height:1.8;">
+                El nuevo Pod arrancó con un sistema de archivos completamente vacío. La tabla <code>productos</code> y todos los registros desaparecieron al morir el contenedor anterior. Esto es exactamente por qué <strong>nunca se debe correr una base de datos en producción sin un PersistentVolume</strong>.
+              </div>
+            </div>
+          </div>
+
+            </div>
+          </div>
+
+          <!-- PARTE 2 -->
+          <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:16px;margin:16px 0;">
+            <div style="font-weight:700;font-size:1rem;color:#15803d;margin-bottom:4px;">&#128994; PARTE 2 — La solución: PersistentVolumeClaim</div>
+            <div style="font-size:.87rem;color:#14532d;">PostgreSQL con PVC — los datos sobreviven al reinicio del Pod</div>
+          </div>
+
+          <div class="lab-block">
+            <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-9 Parte 2 — PostgreSQL con PVC</span></div>
+            <div class="lab-content">
+
+          <!-- Step 5 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 5</span><span class="theory-title">Limpiar Parte 1 y verificar StorageClass</span></div>
+            <pre><span class="c"># Eliminar el Deployment sin volumen (reutilizamos namespace y secret)</span>
+kubectl delete -f k8s/part1-postgres-no-volume.yaml
+
+<span class="c"># Verificar que Docker Desktop tiene StorageClass disponible</span>
+kubectl get storageclass
+<span class="c"># NAME                 PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE</span>
+<span class="c"># hostpath (default)   docker.io/hostpath   Delete          Immediate</span></pre>
+          </div>
+
+          <!-- Step 6 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Desplegar PVC + PostgreSQL con volumen</span></div>
+            <pre>kubectl apply -f k8s/part2-postgres-pvc.yaml
+<span class="c"># persistentvolumeclaim/postgres-pvc created</span>
+<span class="c"># deployment.apps/postgres created</span>
+<span class="c"># service/postgres-svc created</span>
+
+<span class="c"># Verificar que el PVC está Bound (K8s asignó un PV)</span>
+kubectl get pvc -n lab2-9
+<span class="c"># NAME           STATUS   VOLUME         CAPACITY   ACCESS MODES   STORAGECLASS   AGE</span>
+<span class="c"># postgres-pvc   Bound    pvc-abc123..   1Gi        RWO            hostpath       8s</span>
+<span class="c">#                ^^^^^^</span>
+<span class="c">#                Bound = listo para usar</span>
+
+kubectl get pods -n lab2-9
+<span class="c"># NAME                       READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># postgres-xxxx-ccccc        1/1     Running   0          20s</span></pre>
+          </div>
+
+          <!-- Step 7 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 7</span><span class="theory-title">Insertar datos de nuevo</span></div>
+            <pre>kubectl exec -it deployment/postgres -n lab2-9 -- psql -U admin -d labdb</pre>
+            <pre style="background:#1a1a2e;color:#e2e8f0;border-radius:8px;padding:14px;font-size:.82rem;line-height:1.8;"><span style="color:#a78bfa;">labdb=#</span> CREATE TABLE productos (
+          id SERIAL PRIMARY KEY, nombre VARCHAR(100), precio DECIMAL(10,2)
+        );
+<span style="color:#4ade80;">CREATE TABLE</span>
+
+<span style="color:#a78bfa;">labdb=#</span> INSERT INTO productos (nombre, precio) VALUES ('Teclado Mecanico', 89.99);
+<span style="color:#a78bfa;">labdb=#</span> INSERT INTO productos (nombre, precio) VALUES ('Mouse Logitech',   45.00);
+<span style="color:#a78bfa;">labdb=#</span> INSERT INTO productos (nombre, precio) VALUES ('Monitor 4K',      349.00);
+
+<span style="color:#a78bfa;">labdb=#</span> SELECT * FROM productos;
+<span style="color:#94a3b8;"> id |     nombre       | precio
+----+------------------+--------
+  1 | Teclado Mecanico |  89.99
+  2 | Mouse Logitech   |  45.00
+  3 | Monitor 4K       | 349.00</span>
+
+<span style="color:#a78bfa;">labdb=#</span> \q</pre>
+          </div>
+
+          <!-- Step 8 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 8</span><span class="theory-title">Eliminar el Pod — el momento de la verdad</span></div>
+            <pre><span class="c"># Eliminar el Pod</span>
+kubectl delete pod -l app=postgres -n lab2-9
+
+<span class="c"># K8s crea uno nuevo automáticamente — monta el mismo PVC</span>
+kubectl get pods -n lab2-9 -w
+<span class="c"># postgres-xxxx-ccccc   Terminating</span>
+<span class="c"># postgres-xxxx-dddd    ContainerCreating</span>
+<span class="c"># postgres-xxxx-dddd    1/1   Running   0   11s</span></pre>
+          </div>
+
+          <!-- Step 9 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 9</span><span class="theory-title">Verificar que los datos sobrevivieron</span></div>
+            <pre><span class="c"># Conectar al NUEVO Pod</span>
+kubectl exec -it deployment/postgres -n lab2-9 -- psql -U admin -d labdb</pre>
+            <pre style="background:#1a1a2e;color:#e2e8f0;border-radius:8px;padding:14px;font-size:.82rem;line-height:1.8;"><span style="color:#a78bfa;">labdb=#</span> SELECT * FROM productos;
+<span style="color:#94a3b8;"> id |     nombre       | precio
+----+------------------+--------
+  1 | Teclado Mecanico |  89.99
+  2 | Mouse Logitech   |  45.00
+  3 | Monitor 4K       | 349.00
+(3 rows)</span>
+
+<span style="color:#a78bfa;">labdb=#</span> \q</pre>
+            <div style="background:#f0fdf4;border:1.5px solid #4ade80;border-radius:10px;padding:14px;margin:10px 0;">
+              <div style="font-weight:700;color:#166534;margin-bottom:6px;">&#10003; Los datos sobrevivieron</div>
+              <div style="font-size:.87rem;color:#14532d;line-height:1.8;">
+                El nuevo Pod montó exactamente el mismo PVC. Los datos estaban en el disco del nodo, completamente desacoplados del ciclo de vida del contenedor. Esto es lo que hace posible correr bases de datos con rolling updates, autoscaling y recuperación automática de fallos.
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 10 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 10</span><span class="theory-title">Inspeccionar PVC y PV</span></div>
+            <pre><span class="c"># Ver el PVC y el PV provisionado automáticamente</span>
+kubectl get pvc,pv -n lab2-9
+
+<span class="c"># Descripción completa del PVC</span>
+kubectl describe pvc postgres-pvc -n lab2-9
+<span class="c"># Name:          postgres-pvc</span>
+<span class="c"># Namespace:     lab2-9</span>
+<span class="c"># StorageClass:  hostpath</span>
+<span class="c"># Status:        Bound</span>
+<span class="c"># Volume:        pvc-abc123...</span>
+<span class="c"># Capacity:      1Gi</span>
+<span class="c"># Access Modes:  RWO</span></pre>
+          </div>
+
+          <!-- Step 11 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 11</span><span class="theory-title">Limpiar</span></div>
+            <pre><span class="c"># Borrar el namespace elimina todo: pods, services, secret, PVC y PV</span>
+kubectl delete namespace lab2-9
+
+kubectl get pv   <span class="c"># sin PVs del lab</span></pre>
+          </div>
+
+            </div>
+          </div>
+
+          <!-- TABLA COMPARATIVA FINAL -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Resumen</span><span class="theory-title">Sin volumen vs Con PVC — comparación</span></div>
+            <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+              <thead>
+                <tr style="background:#1e293b;color:#e2e8f0;">
+                  <th style="padding:9px 14px;text-align:left;"></th>
+                  <th style="padding:9px 14px;text-align:left;">Sin volumen (Parte 1)</th>
+                  <th style="padding:9px 14px;text-align:left;">Con PVC (Parte 2)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                  <td style="padding:8px 14px;font-weight:600;">Datos tras reiniciar Pod</td>
+                  <td style="padding:8px 14px;color:#dc2626;font-weight:700;">Perdidos ✗</td>
+                  <td style="padding:8px 14px;color:#16a34a;font-weight:700;">Sobreviven ✓</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#fff;">
+                  <td style="padding:8px 14px;font-weight:600;">Dónde viven los datos</td>
+                  <td style="padding:8px 14px;">Capa efímera del contenedor</td>
+                  <td style="padding:8px 14px;">PV en el disco del nodo</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                  <td style="padding:8px 14px;font-weight:600;">Rolling update</td>
+                  <td style="padding:8px 14px;color:#dc2626;">Datos perdidos ✗</td>
+                  <td style="padding:8px 14px;color:#16a34a;">PVC reasignado ✓</td>
+                </tr>
+                <tr style="background:#fff;">
+                  <td style="padding:8px 14px;font-weight:600;">Uso en producción</td>
+                  <td style="padding:8px 14px;color:#dc2626;">Nunca para BD ✗</td>
+                  <td style="padding:8px 14px;color:#16a34a;">Siempre para BD ✓</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <ul class="task-list">
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Desplegar PostgreSQL sin volumen, insertar datos y confirmar que se pierden al borrar el Pod</span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear un PVC y verificar que pasa a estado <code>Bound</code></span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Desplegar PostgreSQL con PVC, insertar datos, borrar Pod y confirmar que los datos persisten</span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar la diferencia entre PVC, PV y StorageClass</span><span class="ttag tt-theory">teoría</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Limpiar con <code>kubectl delete namespace lab2-9</code></span><span class="ttag tt-lab">lab</span></li>
+          </ul>
+
+        </div>
+      </div>
+
       <!-- ─── 2.3 LAB 2-A ─── -->
       <div class="module">
         <div class="mod-header">
-          <span class="mod-icon">🧪</span>
+          <span class="mod-icon">&#129514;</span>
           <span class="mod-title">2.4 — Lab 2-A: Spring Boot en Kubernetes — Deployment completo</span>
           <span class="mod-duration">Semana 4–5 — Lab completo</span>
         </div>
