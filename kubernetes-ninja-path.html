@@ -5713,15 +5713,24 @@ kubectl get services <span class="c"># solo "kubernetes"</span></pre>
         <div class="mod-body">
 
           <!-- OBJETIVOS -->
-          <div class="theory-block">
-            <div class="theory-header"><span class="theory-tag">Objetivos</span><span class="theory-title">¿Qué vas a aprender en este lab?</span></div>
-            <div class="theory-body">
-              <ul style="margin:0 0 0 18px;padding:0;line-height:2;">
-                <li>Entender por qué los datos dentro de un Pod son <strong>efímeros</strong> — mueren con el contenedor</li>
-                <li>Demostrar en vivo la pérdida de datos al reiniciar un Pod <strong>sin volumen</strong></li>
-                <li>Crear un <code>PersistentVolumeClaim</code> y montarlo en PostgreSQL</li>
-                <li>Verificar que los datos <strong>sobreviven</strong> al reinicio del Pod con PVC</li>
-                <li>Entender el flujo PVC → PV → StorageClass y qué hace cada pieza</li>
+          <div class="lab-overview">
+            <div class="lab-overview-box lov-what">
+              <div class="lov-title">&#10024; ¿Qué aprenderás?</div>
+              <ul>
+                <li>Por qué los datos dentro de un Pod son <strong>efímeros</strong> y mueren con el contenedor</li>
+                <li>El flujo <strong>PVC → PV → StorageClass</strong> y qué hace cada pieza</li>
+                <li>Diferencia entre <code>emptyDir</code> (temporal) y <code>PersistentVolume</code> (permanente)</li>
+                <li>Por qué <code>PGDATA</code> debe apuntar a un subdirectorio del mount en Docker Desktop</li>
+                <li>Cómo el PVC <strong>desacopla los datos del ciclo de vida del Pod</strong></li>
+              </ul>
+            </div>
+            <div class="lab-overview-box lov-goals">
+              <div class="lov-title">&#128296; ¿Qué harás?</div>
+              <ul>
+                <li><strong>Parte 1:</strong> desplegar PostgreSQL <strong>sin volumen</strong>, insertar datos, borrar el Pod y confirmar en vivo que los datos desaparecieron</li>
+                <li><strong>Parte 2:</strong> crear un <code>PersistentVolumeClaim</code> de 1Gi, montarlo en PostgreSQL, insertar datos, borrar el Pod y confirmar que los datos sobreviven</li>
+                <li>Inspeccionar el PVC con <code>kubectl get pvc</code> y verificar el estado <code>Bound</code></li>
+                <li>Limpiar todo con <code>kubectl delete namespace lab2-9</code></li>
               </ul>
             </div>
           </div>
