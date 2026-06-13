@@ -5818,6 +5818,84 @@ volumeMounts:
             </div>
           </div>
 
+          <!-- TEORÍA: kubectl get pvc,pv -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">kubectl get pvc,pv — cómo leer la salida</span></div>
+            <div class="theory-body">
+              <p>Estos dos comandos son los más importantes para diagnosticar el estado del almacenamiento en K8s. Aquí el output real del lab y lo que significa cada columna:</p>
+            </div>
+            <pre><span class="c"># Ver PVC y PV juntos — el estado del almacenamiento del namespace</span>
+kubectl get pvc,pv -n lab2-9</pre>
+            <pre style="background:#1a1a2e;color:#e2e8f0;border-radius:8px;padding:16px;font-size:.81rem;line-height:2;overflow-x:auto;">NAME                                 STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+<span style="color:#4ade80;">persistentvolumeclaim/postgres-pvc</span>   Bound    pvc-18b954e9-83d3-4717-b7d8-b90a332b21c2   1Gi        RWO            hostpath       2m
+
+NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                  STORAGECLASS   AGE
+<span style="color:#60a5fa;">persistentvolume/pvc-18b954e9-83d3-4717-b7d8-b90a332b21c2</span>   1Gi        RWO            Delete           Bound    lab2-9/postgres-pvc    hostpath       2m</pre>
+
+            <div style="overflow-x:auto;margin:14px 0;">
+              <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+                <thead>
+                  <tr style="background:#1e293b;color:#e2e8f0;">
+                    <th style="padding:9px 14px;text-align:left;">Columna</th>
+                    <th style="padding:9px 14px;text-align:left;">Valor en el lab</th>
+                    <th style="padding:9px 14px;text-align:left;">Qué significa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                    <td style="padding:8px 14px;font-weight:700;color:#1e293b;">STATUS</td>
+                    <td style="padding:8px 14px;"><code style="color:#16a34a;font-weight:700;">Bound</code></td>
+                    <td style="padding:8px 14px;">PVC ligado a un PV ✓ — el Pod puede montarlo. Si dice <code>Pending</code>, K8s aún no encontró PV disponible.</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #e2e8f0;background:#fff;">
+                    <td style="padding:8px 14px;font-weight:700;color:#1e293b;">VOLUME</td>
+                    <td style="padding:8px 14px;"><code>pvc-18b954...</code></td>
+                    <td style="padding:8px 14px;">Nombre autogenerado del PV que K8s creó para este PVC. El PVC y el PV se referencian mutuamente por este nombre.</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                    <td style="padding:8px 14px;font-weight:700;color:#1e293b;">CAPACITY</td>
+                    <td style="padding:8px 14px;"><code>1Gi</code></td>
+                    <td style="padding:8px 14px;">Almacenamiento provisionado. Pediste 1Gi en el PVC y K8s lo asignó exactamente.</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #e2e8f0;background:#fff;">
+                    <td style="padding:8px 14px;font-weight:700;color:#1e293b;">ACCESS MODES</td>
+                    <td style="padding:8px 14px;"><code>RWO</code></td>
+                    <td style="padding:8px 14px;"><strong>ReadWriteOnce</strong> — un solo nodo puede leer y escribir. Correcto para PostgreSQL con 1 réplica. <code>RWX</code> (ReadWriteMany) sería para archivos compartidos entre varios Pods.</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                    <td style="padding:8px 14px;font-weight:700;color:#1e293b;">STORAGECLASS</td>
+                    <td style="padding:8px 14px;"><code>hostpath</code></td>
+                    <td style="padding:8px 14px;">El proveedor de almacenamiento. <code>hostpath</code> = directorio en el disco del nodo (Docker Desktop). En AWS sería <code>gp3</code> o <code>io1</code> (EBS). En GCP sería <code>standard</code> (Persistent Disk).</td>
+                  </tr>
+                  <tr style="background:#fff;">
+                    <td style="padding:8px 14px;font-weight:700;color:#1e293b;">RECLAIM POLICY</td>
+                    <td style="padding:8px 14px;"><code>Delete</code></td>
+                    <td style="padding:8px 14px;">Qué pasa con el PV cuando se borra el PVC. <code>Delete</code> = el disco se elimina (bueno para labs). <code>Retain</code> = el disco queda para recuperación manual (recomendado en producción).</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:14px;margin:12px 0;">
+              <div style="font-weight:700;color:#92400e;margin-bottom:8px;">&#9888; RECLAIM POLICY en producción: siempre <code>Retain</code></div>
+              <div style="font-size:.87rem;color:#78350f;line-height:1.8;">
+                Con <code>Delete</code>, si alguien borra accidentalmente el PVC — o un script de CI elimina el namespace por error — el disco y todos sus datos desaparecen <strong>de forma inmediata e irrecuperable</strong>.<br><br>
+                En producción siempre se usa <code>Retain</code>: el PV queda en estado <code>Released</code> y un administrador puede recuperar los datos antes de borrarlo definitivamente. Es el equivalente a la papelera de reciclaje para el almacenamiento de K8s.
+              </div>
+            </div>
+
+            <pre><span class="c"># Ver detalle completo del PVC — incluyendo qué Pod lo está usando</span>
+kubectl describe pvc postgres-pvc -n lab2-9
+
+<span class="c"># Ver todos los PVs del clúster (son globales, no pertenecen a un namespace)</span>
+kubectl get pv
+
+<span class="c"># Ver el StorageClass disponible en tu clúster</span>
+kubectl get storageclass
+<span class="c"># NAME                 PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE</span>
+<span class="c"># hostpath (default)   docker.io/hostpath   Delete          Immediate</span></pre>
+          </div>
+
           <!-- DIAGRAMA VISUAL -->
           <div class="theory-block">
             <div class="theory-header"><span class="theory-tag">Diagrama</span><span class="theory-title">Parte 1 vs Parte 2 — el contraste visual</span></div>
