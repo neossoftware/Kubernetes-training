@@ -2,19 +2,21 @@
 
 Aprende a desplegar un sistema fullstack en Kubernetes donde el **API es solo accesible internamente** (ClusterIP) y el **frontend es accesible desde el browser** (NodePort). El frontend Angular actúa como proxy — el browser nunca llega al API directamente.
 
+> **Namespace:** todo este lab corre en el namespace `lab2-8` para evitar conflictos de nombres con otros labs.
+
 ## Arquitectura
 
 ```
 Browser
   │  http://localhost:30093
   ▼
-frontend-svc (NodePort :30093)
+frontend-svc (NodePort :30093)  [namespace: lab2-8]
   │
   ▼
 frontend Pod ×2 (nginx)
   │  /api/* → proxy_pass http://api-svc:8080  (interno)
   ▼
-api-svc (ClusterIP — NO accesible desde fuera)
+api-svc (ClusterIP — NO accesible desde fuera)  [namespace: lab2-8]
   │
   ▼
 products-api Pod ×3 (Spring Boot + logs)
@@ -41,6 +43,7 @@ frontend/
   nginx.conf                  ← proxy_pass /api/ → api-svc:8080
   Dockerfile
 k8s/
+  namespace.yaml              ← namespace lab2-8
   secret.yaml                 ← credenciales BD (base64)
   api-deployment.yaml         ← 3 réplicas, Service ClusterIP
   frontend-deployment.yaml    ← 2 réplicas, Service NodePort :30093
@@ -56,10 +59,9 @@ PostgreSQL corriendo y labs anteriores limpios:
 docker exec postgres-lab pg_isready -U admin -d labdb
 # localhost:5432 - accepting connections
 
-# Limpiar lab anterior si está corriendo
-kubectl delete deployment products-api --ignore-not-found
-kubectl delete service api-svc products-api-svc --ignore-not-found
-kubectl delete secret db-secret --ignore-not-found
+# Si tienes recursos del lab en el namespace default, límpialos
+kubectl delete deployment products-api frontend --ignore-not-found -n default
+kubectl delete service api-svc frontend-svc --ignore-not-found -n default
 ```
 
 ---
@@ -99,9 +101,13 @@ El `env.js` tiene `API_URL: ''` — Angular hace llamadas relativas (`/api/*`) q
 
 ---
 
-## Step 4 — Desplegar Secret y API (ClusterIP)
+## Step 4 — Crear el namespace y desplegar todo
 
 ```bash
+# Crear el namespace lab2-8
+kubectl apply -f k8s/namespace.yaml
+# namespace/lab2-8 created
+
 # Secret con credenciales de BD
 kubectl apply -f k8s/secret.yaml
 # secret/db-secret created
@@ -111,17 +117,23 @@ kubectl apply -f k8s/api-deployment.yaml
 # deployment.apps/products-api created
 # service/api-svc created
 
-kubectl get pods -l app=products-api
-# NAME                           READY   STATUS    RESTARTS   AGE
-# products-api-xxxx-aaaaa        1/1     Running   0          25s
-# products-api-xxxx-bbbbb        1/1     Running   0          25s
-# products-api-xxxx-ccccc        1/1     Running   0          25s
+# Frontend — 2 réplicas, Service NodePort :30093
+kubectl apply -f k8s/frontend-deployment.yaml
+# deployment.apps/frontend created
+# service/frontend-svc created
 
-kubectl get service api-svc
-# NAME      TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE
-# api-svc   ClusterIP   10.96.x.x     <none>        8080/TCP   30s
-#                                     ^^^^^^
-#                                     Sin puerto externo — inaccesible desde fuera
+# Ver todo en el namespace
+kubectl get pods,services -n lab2-8
+# NAME                                READY   STATUS    RESTARTS   AGE
+# pod/frontend-xxxx-aaaaa             1/1     Running   0          20s
+# pod/frontend-xxxx-bbbbb             1/1     Running   0          20s
+# pod/products-api-xxxx-aaaaa         1/1     Running   0          25s
+# pod/products-api-xxxx-bbbbb         1/1     Running   0          25s
+# pod/products-api-xxxx-ccccc         1/1     Running   0          25s
+#
+# NAME                   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+# service/api-svc        ClusterIP   10.96.x.x       <none>        8080/TCP       25s
+# service/frontend-svc   NodePort    10.97.x.x       <none>        80:30093/TCP   20s
 ```
 
 ---
@@ -133,8 +145,8 @@ kubectl get service api-svc
 curl http://localhost:8080/api/products
 # curl: (7) Failed to connect to localhost port 8080: Connection refused
 
-# Confirmar que es ClusterIP
-kubectl get service api-svc -o jsonpath='{.spec.type}'
+# Confirmar que es ClusterIP (sin EXTERNAL-IP ni nodePort)
+kubectl get service api-svc -n lab2-8 -o jsonpath='{.spec.type}'
 # ClusterIP
 ```
 
@@ -144,52 +156,32 @@ Este es el comportamiento esperado. El API es invisible desde fuera del clúster
 
 ## Step 6 — Troubleshooting desde dentro del clúster
 
-Cuando el API es ClusterIP, se prueba con un Pod temporal:
+Cuando el API es ClusterIP, se prueba con un Pod temporal **en el mismo namespace**:
 
 ```bash
 # Pod temporal con curl — se elimina solo al salir
-kubectl run tmp-curl --image=curlimages/curl --restart=Never --rm -it \
+kubectl run tmp-curl -n lab2-8 --image=curlimages/curl --restart=Never --rm -it \
   -- curl http://api-svc:8080/api/products/health
 # {"status":"UP","products":"5"}
 # pod "tmp-curl" deleted
 
 # Entrar a un Pod existente
-kubectl exec -it deployment/products-api -- sh
+kubectl exec -it deployment/products-api -n lab2-8 -- sh
 # / # wget -qO- http://localhost:8080/api/products/health
 # {"status":"UP","products":"5"}
 # / # exit
 
 # Probar comunicación entre servicios (como lo hará nginx)
-kubectl run tmp-curl --image=curlimages/curl --restart=Never --rm -it \
+kubectl run tmp-curl -n lab2-8 --image=curlimages/curl --restart=Never --rm -it \
   -- curl http://api-svc:8080/api/products
 # {"data":[...],"total":5}
 ```
 
-> K8s resuelve `api-svc` automáticamente al ClusterIP del Service. El nombre completo es `api-svc.default.svc.cluster.local`, pero dentro del mismo namespace basta con `api-svc`.
+> K8s resuelve `api-svc` automáticamente al ClusterIP del Service dentro del mismo namespace. El nombre completo es `api-svc.lab2-8.svc.cluster.local`, pero dentro del mismo namespace basta con `api-svc`.
 
 ---
 
-## Step 7 — Desplegar el Frontend Angular (NodePort)
-
-```bash
-kubectl apply -f k8s/frontend-deployment.yaml
-# deployment.apps/frontend created
-# service/frontend-svc created
-
-kubectl get pods -l app=frontend
-# NAME                        READY   STATUS    RESTARTS   AGE
-# frontend-xxxx-aaaaa         1/1     Running   0          15s
-# frontend-xxxx-bbbbb         1/1     Running   0          15s
-
-kubectl get services
-# NAME           TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
-# api-svc        ClusterIP   10.96.x.x     <none>        8080/TCP       3m
-# frontend-svc   NodePort    10.97.x.x     <none>        80:30093/TCP   15s
-```
-
----
-
-## Step 8 — Abrir la app en el browser
+## Step 7 — Abrir la app en el browser
 
 Abre **http://localhost:30093** en tu navegador.
 
@@ -197,21 +189,21 @@ Crea, edita y elimina productos. Cada acción llama a `/api/*`, nginx lo reenví
 
 ```bash
 # Ver los logs del API en tiempo real
-kubectl logs -l app=products-api -f --prefix
+kubectl logs -l app=products-api -n lab2-8 -f --prefix
 ```
 
 ---
 
-## Step 9 — Verificar el flujo nginx → API en los logs
+## Step 8 — Verificar el flujo nginx → API en los logs
 
 ```bash
 # Logs del frontend (nginx access log)
-kubectl logs -l app=frontend --tail=20
+kubectl logs -l app=frontend -n lab2-8 --tail=20
 # 10.x.x.x - "GET /api/products HTTP/1.0" 200
 # 10.x.x.x - "POST /api/products HTTP/1.0" 201
 
 # Logs del API (Spring Boot) — mismas peticiones desde el otro lado
-kubectl logs -l app=products-api --tail=20
+kubectl logs -l app=products-api -n lab2-8 --tail=20
 # INFO [GET]  /api/products - 5 productos encontrados
 # INFO [POST] /api/products - creando: name=Teclado, price=89.99
 ```
@@ -220,16 +212,16 @@ La IP en los logs de nginx es la IP interna del Pod — tráfico Pod-a-Pod, nunc
 
 ---
 
-## Step 10 — Limpiar
+## Step 9 — Limpiar
 
 ```bash
-kubectl delete -f k8s/frontend-deployment.yaml
-kubectl delete -f k8s/api-deployment.yaml
-kubectl delete -f k8s/secret.yaml
+# Eliminar todo borrando el namespace completo
+kubectl delete namespace lab2-8
 
-kubectl get pods     # sin pods
-kubectl get services # solo "kubernetes"
+kubectl get namespaces | grep lab2-8   # ya no aparece
 ```
+
+> Borrar el namespace elimina **todos** sus recursos (pods, services, secrets) de una sola vez — no hay que borrarlos uno a uno.
 
 ---
 
@@ -237,10 +229,11 @@ kubectl get services # solo "kubernetes"
 
 | Concepto | Descripción |
 |----------|-------------|
+| `namespace` | Ámbito de aislamiento — recursos de distintos labs no colisionan |
 | `ClusterIP` | Service accesible solo dentro del clúster — sin puerto externo |
 | `NodePort` | Service accesible desde fuera — abre un puerto en el nodo |
 | `proxy_pass` | nginx reenvía `/api/*` al Service interno `api-svc:8080` |
 | `env.js` | Configuración runtime de Angular — `API_URL: ''` para K8s |
-| `kubectl run tmp-curl` | Pod temporal para troubleshooting interno |
-| `kubectl exec -it` | Entrar a un Pod existente para diagnóstico |
-| Service Discovery | K8s resuelve `api-svc` al ClusterIP automáticamente via DNS |
+| `kubectl -n lab2-8` | Flag para operar en un namespace específico |
+| `kubectl run tmp-curl -n lab2-8` | Pod temporal en el namespace correcto para troubleshooting |
+| Service Discovery | K8s resuelve `api-svc` al ClusterIP via DNS dentro del mismo namespace |
