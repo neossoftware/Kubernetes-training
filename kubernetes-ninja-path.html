@@ -6267,6 +6267,386 @@ kubectl get pv   <span class="c"># sin PVs del lab</span></pre>
         </div>
       </div>
 
+      <!-- ─── LAB 2-10 FULLSTACK POSTGRES ─── -->
+      <div class="module">
+        <div class="mod-header" onclick="toggleModule(this)">
+          <span class="mod-icon">&#127381;</span>
+          <span class="mod-title">2.4 — Lab 2-10: Fullstack en K8s — React + Node.js + PostgreSQL con PVC</span>
+          <span class="mod-duration">Semana 4 — Lab completo</span>
+        </div>
+        <div class="mod-body">
+
+          <!-- OBJETIVOS -->
+          <div class="lab-overview">
+            <div class="lab-overview-box lov-what">
+              <div class="lov-title">&#10024; ¿Qué aprenderás?</div>
+              <ul>
+                <li>Cómo conectar tres capas dentro de K8s usando <strong>Service DNS</strong> — frontend → API → BD</li>
+                <li>Patrón <strong><code>initDB()</code></strong>: la app crea su tabla al arrancar si no existe</li>
+                <li>Por qué solo la capa de datos necesita PVC — API y frontend son <strong>stateless</strong></li>
+                <li>Cómo el Secret inyecta credenciales de BD en los Pods de la API</li>
+                <li>Cómo verificar el <strong>balanceo de carga</strong> entre réplicas de la API con el hostname</li>
+                <li>Cómo <code>kubectl wait</code> garantiza el orden de arranque en un deploy</li>
+              </ul>
+            </div>
+            <div class="lab-overview-box lov-goals">
+              <div class="lov-title">&#128296; ¿Qué construirás?</div>
+              <ul>
+                <li><strong>PostgreSQL 16</strong> — 1 réplica, PVC 1Gi, Service ClusterIP</li>
+                <li><strong>API Node.js</strong> — 2 réplicas, Express + pg, ClusterIP; crea tabla y seed al arrancar</li>
+                <li><strong>Frontend React</strong> — 2 réplicas, Vite + nginx proxy, NodePort <code>:30094</code></li>
+                <li>CRUD completo desde el browser con datos persistentes en PostgreSQL</li>
+                <li>Demo de persistencia: agregar producto → borrar Pods de API → el producto sigue ahí</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- TEORÍA: arquitectura 3 capas -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Arquitectura 3 capas dentro de Kubernetes</span></div>
+            <div class="theory-body">
+              <p>En los labs anteriores la BD corría en Docker externo al clúster. En este lab las <strong>tres capas viven dentro de K8s</strong> — cada una en su propio Deployment, comunicadas por Services internos.</p>
+            </div>
+            <pre style="font-size:.81rem;line-height:2;">Browser (http://localhost:30094)
+    │
+    ▼
+frontend-svc  (NodePort :30094)
+    │
+    ▼
+frontend Pod ×2   React + nginx
+    │   location /api/  →  proxy_pass http://api-svc:3000
+    ▼
+api-svc  (ClusterIP — NO accesible desde fuera)
+    │
+    ▼
+api Pod ×2   Node.js + Express + pg
+    │   DB_HOST=postgres-svc  (K8s DNS lo resuelve al ClusterIP)
+    ▼
+postgres-svc  (ClusterIP — NO accesible desde fuera)
+    │
+    ▼
+postgres Pod ×1   PostgreSQL 16-alpine
+    │   mountPath: /var/lib/postgresql/data
+    ▼
+PersistentVolumeClaim  postgres-pvc (1Gi)
+    │
+    ▼
+PersistentVolume  (hostpath en Docker Desktop / EBS en AWS)</pre>
+            <div style="background:#eff6ff;border:1.5px solid #3b82f6;border-radius:10px;padding:14px;margin:12px 0;">
+              <div style="font-weight:700;color:#1e40af;margin-bottom:8px;">&#128161; Regla: ¿quién necesita PVC?</div>
+              <div style="font-size:.87rem;color:#1e3a8a;line-height:1.9;">
+                <strong style="color:#dc2626;">Solo PostgreSQL</strong> — guarda datos que deben sobrevivir a reinicios.<br>
+                <strong style="color:#16a34a;">API Node.js</strong> — stateless. No guarda nada en disco. Escala libremente a 0, 2, 10 réplicas.<br>
+                <strong style="color:#16a34a;">Frontend React</strong> — stateless. Solo sirve archivos estáticos. Escala libremente.<br><br>
+                Esta separación es el núcleo de la arquitectura de microservicios: <em>stateless scale out, stateful scale up con PVC</em>.
+              </div>
+            </div>
+          </div>
+
+          <!-- TEORÍA: Service DNS y cómo se comunican las capas -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Cómo se comunican las 3 capas — Service DNS de K8s</span></div>
+            <div class="theory-body">
+              <p>Cada Service en K8s registra un nombre DNS automáticamente. Los Pods del mismo namespace pueden llamarse por nombre de Service sin conocer la IP:</p>
+            </div>
+            <pre style="font-size:.82rem;line-height:1.9;"><span class="c"># api-deployment.yaml — env vars que conectan la API a PostgreSQL</span>
+env:
+  - name: DB_HOST
+    value: "postgres-svc"       <span class="c"># K8s DNS resuelve: postgres-svc → 10.98.x.x (ClusterIP)</span>
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_USER
+    valueFrom:
+      secretKeyRef:             <span class="c"># credencial inyectada desde el Secret</span>
+        name: postgres-secret
+        key: POSTGRES_USER
+
+<span class="c"># api/index.js — Pool de conexiones usa esas variables</span>
+const pool = new Pool({
+  host:     process.env.DB_HOST,      <span class="c"># "postgres-svc"</span>
+  port:     process.env.DB_PORT,      <span class="c"># 5432</span>
+  user:     process.env.DB_USER,      <span class="c"># del Secret</span>
+  password: process.env.DB_PASSWORD,  <span class="c"># del Secret</span>
+  database: process.env.DB_NAME,      <span class="c"># del Secret</span>
+});</pre>
+            <div style="background:#f0fdf4;border:1.5px solid #4ade80;border-radius:10px;padding:14px;margin:12px 0;">
+              <div style="font-weight:700;color:#166534;margin-bottom:8px;">&#128260; Flujo completo de una petición</div>
+              <div style="font-size:.87rem;color:#14532d;line-height:2;">
+                <strong>1.</strong> Browser → <code>GET http://localhost:30094/api/products</code><br>
+                <strong>2.</strong> nginx intercepta <code>location /api/</code> → <code>proxy_pass http://api-svc:3000</code><br>
+                <strong>3.</strong> K8s balancea entre los 2 Pods de API<br>
+                <strong>4.</strong> Node.js ejecuta <code>SELECT * FROM products ORDER BY id</code><br>
+                <strong>5.</strong> PostgreSQL devuelve filas → Node.js → nginx → browser → React renderiza la tabla
+              </div>
+            </div>
+          </div>
+
+          <!-- TEORÍA: initDB() -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Patrón initDB() — la app crea su propia tabla al arrancar</span></div>
+            <div class="theory-body">
+              <p>La API usa un patrón común en aplicaciones K8s: al arrancar, verifica si la tabla existe y la crea si no. Esto elimina la necesidad de ejecutar migraciones manualmente antes del primer deploy:</p>
+            </div>
+            <pre style="font-size:.82rem;line-height:1.8;"><span class="c">// api/index.js — se ejecuta una sola vez al arrancar el Pod</span>
+async function initDB() {
+  <span class="c">// Crea la tabla si no existe (idempotente — seguro de llamar varias veces)</span>
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id          SERIAL PRIMARY KEY,
+      name        VARCHAR(100) NOT NULL,
+      price       DECIMAL(10,2) NOT NULL,
+      stock       INTEGER DEFAULT 0,
+      description TEXT DEFAULT ''
+    )
+  `);
+  <span class="c">// Si la tabla está vacía, inserta productos de ejemplo</span>
+  const { rows } = await pool.query('SELECT COUNT(*) FROM products');
+  if (parseInt(rows[0].count) === 0) {
+    await pool.query(`INSERT INTO products (name, price, stock) VALUES ...`);
+  }
+  console.log('Base de datos lista');
+}
+
+<span class="c">// La app solo arranca si la BD está disponible</span>
+initDB()
+  .then(() => app.listen(3000, '0.0.0.0'))
+  .catch(err => { console.error(err); process.exit(1); });</pre>
+            <div style="background:#faf5ff;border:1.5px solid #a78bfa;border-radius:10px;padding:14px;margin:12px 0;">
+              <div style="font-weight:700;color:#6d28d9;margin-bottom:8px;">&#128161; Por qué <code>CREATE TABLE IF NOT EXISTS</code> es importante</div>
+              <div style="font-size:.87rem;color:#4c1d95;line-height:1.8;">
+                Los 2 Pods de la API arrancan casi al mismo tiempo. Ambos llaman a <code>initDB()</code>. PostgreSQL maneja esto correctamente: el segundo <code>CREATE TABLE IF NOT EXISTS</code> simplemente no hace nada si la tabla ya existe. Es <strong>idempotente</strong> — seguro de ejecutar N veces.
+              </div>
+            </div>
+          </div>
+
+          <!-- DIAGRAMA: orden de despliegue -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Diagrama</span><span class="theory-title">Orden de despliegue — por qué importa</span></div>
+            <pre style="font-size:.81rem;line-height:2;">1. kubectl apply -f k8s/namespace.yaml       ← primero el namespace
+2. kubectl apply -f k8s/secret.yaml          ← credenciales disponibles antes que nadie
+3. kubectl apply -f k8s/postgres-deployment.yaml
+   kubectl wait --for=condition=ready ...    ← esperar a que PG acepte conexiones
+4. kubectl apply -f k8s/api-deployment.yaml  ← la API puede conectarse a PG ya listo
+5. kubectl apply -f k8s/frontend-deployment.yaml  ← el frontend puede hablar con la API</pre>
+            <div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:14px;margin:12px 0;">
+              <div style="font-weight:700;color:#92400e;margin-bottom:8px;">&#9888; Si la API arranca antes que PostgreSQL</div>
+              <div style="font-size:.87rem;color:#78350f;line-height:1.8;">
+                <code>initDB()</code> falla con <em>ECONNREFUSED</em> y Node.js llama a <code>process.exit(1)</code>. K8s detecta el crash y reinicia el Pod automáticamente (<code>CrashLoopBackOff</code>). Eventualmente PostgreSQL estará listo y el Pod arrancará bien.<br><br>
+                El <code>kubectl wait</code> evita esos reinicios — es la forma explícita de declarar la dependencia de arranque.
+              </div>
+            </div>
+          </div>
+
+          <!-- LAB STEPS -->
+          <div class="lab-block">
+            <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 2-10 — React + Node.js + PostgreSQL con PVC en Kubernetes</span></div>
+            <div class="lab-content">
+
+          <!-- Step 1 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 1</span><span class="theory-title">Entrar al lab y construir imagen de la API</span></div>
+            <pre>cd section02-kubernetes-intro/lab-2-10-fullstack-postgres
+
+docker build -t lab2-10-api:1.0 ./api
+
+docker images | grep lab2-10-api
+<span class="c"># lab2-10-api   1.0   ...  (incluye pg — driver de PostgreSQL para Node.js)</span></pre>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 2</span><span class="theory-title">Construir imagen del Frontend React</span></div>
+            <pre>docker build -t lab2-10-frontend:1.0 ./frontend
+
+docker images | grep lab2-10-frontend
+<span class="c"># lab2-10-frontend   1.0   ...</span>
+<span class="c"># VITE_API_URL=''  → llamadas relativas /api/*  → nginx las proxea a api-svc:3000</span></pre>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 3</span><span class="theory-title">Crear namespace y Secret</span></div>
+            <pre>kubectl apply -f k8s/namespace.yaml
+<span class="c"># namespace/lab2-10 created</span>
+
+kubectl apply -f k8s/secret.yaml
+<span class="c"># secret/postgres-secret created</span></pre>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 4</span><span class="theory-title">Desplegar PostgreSQL con PVC y esperar que esté listo</span></div>
+            <pre>kubectl apply -f k8s/postgres-deployment.yaml
+<span class="c"># persistentvolumeclaim/postgres-pvc created</span>
+<span class="c"># deployment.apps/postgres created</span>
+<span class="c"># service/postgres-svc created</span>
+
+<span class="c"># Esperar a que PostgreSQL acepte conexiones antes de levantar la API</span>
+kubectl wait --for=condition=ready pod -l app=postgres -n lab2-10 --timeout=60s
+<span class="c"># pod/postgres-xxxx-aaaa condition met</span>
+
+kubectl get pvc -n lab2-10
+<span class="c"># NAME           STATUS   VOLUME        CAPACITY   ACCESS MODES   STORAGECLASS</span>
+<span class="c"># postgres-pvc   Bound    pvc-abc123    1Gi        RWO            hostpath</span></pre>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 5</span><span class="theory-title">Desplegar la API Node.js</span></div>
+            <pre>kubectl apply -f k8s/api-deployment.yaml
+<span class="c"># deployment.apps/api created</span>
+<span class="c"># service/api-svc created</span>
+
+kubectl logs -l app=api -n lab2-10 --tail=3
+<span class="c"># Datos iniciales insertados</span>
+<span class="c"># Base de datos lista</span>
+<span class="c"># API corriendo en puerto 3000</span></pre>
+          </div>
+
+          <!-- Step 6 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 6</span><span class="theory-title">Desplegar el Frontend y verificar todo el stack</span></div>
+            <pre>kubectl apply -f k8s/frontend-deployment.yaml
+<span class="c"># deployment.apps/frontend created</span>
+<span class="c"># service/frontend-svc created</span>
+
+kubectl get pods,services -n lab2-10
+<span class="c"># NAME                           READY   STATUS    RESTARTS   AGE</span>
+<span class="c"># pod/api-xxxx-aaaa              1/1     Running   0          1m</span>
+<span class="c"># pod/api-xxxx-bbbb              1/1     Running   0          1m</span>
+<span class="c"># pod/frontend-xxxx-aaaa         1/1     Running   0          15s</span>
+<span class="c"># pod/frontend-xxxx-bbbb         1/1     Running   0          15s</span>
+<span class="c"># pod/postgres-xxxx-aaaa         1/1     Running   0          2m</span>
+<span class="c">#</span>
+<span class="c"># NAME                   TYPE        PORT(S)</span>
+<span class="c"># service/api-svc        ClusterIP   3000/TCP</span>
+<span class="c"># service/frontend-svc   NodePort    80:30094/TCP</span>
+<span class="c"># service/postgres-svc   ClusterIP   5432/TCP</span></pre>
+          </div>
+
+          <!-- Step 7 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 7</span><span class="theory-title">Abrir la app y probar el CRUD</span></div>
+            <div class="theory-body"><p>Abre <strong>http://localhost:30094</strong> en el browser. Verás 4 productos cargados desde PostgreSQL.</p></div>
+            <pre><span class="c"># Probar el API directamente (nginx hace el proxy)</span>
+curl http://localhost:30094/api/products
+<span class="c"># {"data":[{"id":1,"name":"Teclado Mecanico",...},...],"total":4}</span>
+
+<span class="c"># Crear un producto nuevo</span>
+curl -X POST http://localhost:30094/api/products \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Auriculares Sony","price":129.99,"stock":12}'
+<span class="c"># {"id":5,"name":"Auriculares Sony","price":"129.99","stock":12}</span>
+
+<span class="c"># Verificar que se insertó en PostgreSQL</span>
+kubectl exec -it deployment/postgres -n lab2-10 -- psql -U admin -d labdb \
+  -c "SELECT id, name, price FROM products ORDER BY id;"
+<span class="c"># 1 | Teclado Mecanico  |  89.99</span>
+<span class="c"># 2 | Monitor Curvo 27" | 349.00</span>
+<span class="c"># 3 | Mouse Ergonomico  |  45.50</span>
+<span class="c"># 4 | Laptop Stand      |  32.00</span>
+<span class="c"># 5 | Auriculares Sony  | 129.99</span></pre>
+          </div>
+
+          <!-- Step 8 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 8</span><span class="theory-title">Demostrar persistencia — borrar Pods de API</span></div>
+            <pre><span class="c"># Borrar todos los Pods de la API (K8s los recrea automáticamente)</span>
+kubectl delete pod -l app=api -n lab2-10
+
+kubectl get pods -l app=api -n lab2-10 -w
+<span class="c"># api-xxxx-aaaa   Terminating</span>
+<span class="c"># api-xxxx-cccc   ContainerCreating</span>
+<span class="c"># api-xxxx-cccc   1/1 Running   0   8s</span>
+
+<span class="c"># Los nuevos Pods se reconectan al mismo PostgreSQL — los datos siguen ahí</span>
+curl http://localhost:30094/api/products | python3 -m json.tool
+<span class="c"># "total": 5  ← el producto Auriculares Sony sigue en la BD</span></pre>
+          </div>
+
+          <!-- Step 9 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 9</span><span class="theory-title">Verificar el balanceo de carga entre Pods de la API</span></div>
+            <pre><span class="c"># El hostname cambia — K8s balancea entre los 2 Pods de la API</span>
+for i in $(seq 1 6); do
+  curl -s http://localhost:30094/api/hello | python3 -c \
+    "import sys,json; print(json.load(sys.stdin)['hostname'])"
+done
+<span class="c"># api-xxxx-cccc</span>
+<span class="c"># api-xxxx-dddd</span>
+<span class="c"># api-xxxx-cccc</span>
+<span class="c"># api-xxxx-dddd</span></pre>
+          </div>
+
+          <!-- Step 10 -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Step 10</span><span class="theory-title">Limpiar</span></div>
+            <pre><span class="c"># Borrar namespace elimina todo: Pods, Services, Secret, PVC y PV</span>
+kubectl delete namespace lab2-10
+
+kubectl get namespaces | grep lab2-10  <span class="c"># ya no aparece</span></pre>
+          </div>
+
+            </div>
+          </div>
+
+          <!-- TABLA CONCEPTOS -->
+          <div class="theory-block">
+            <div class="theory-header"><span class="theory-tag">Resumen</span><span class="theory-title">Tabla de conceptos del lab</span></div>
+            <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+              <thead>
+                <tr style="background:#1e293b;color:#e2e8f0;">
+                  <th style="padding:9px 14px;text-align:left;">Concepto</th>
+                  <th style="padding:9px 14px;text-align:left;">Descripción</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                  <td style="padding:8px 14px;font-weight:600;">3 capas en K8s</td>
+                  <td style="padding:8px 14px;">Frontend, API y BD en sus propios Deployments, conectados por Services internos</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#fff;">
+                  <td style="padding:8px 14px;font-weight:600;"><code>pg Pool</code></td>
+                  <td style="padding:8px 14px;">Pool de conexiones Node.js → PostgreSQL; reutiliza conexiones bajo carga de múltiples réplicas</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                  <td style="padding:8px 14px;font-weight:600;"><code>initDB()</code></td>
+                  <td style="padding:8px 14px;">La app crea su tabla al arrancar con <code>CREATE TABLE IF NOT EXISTS</code> — idempotente y seguro con múltiples réplicas</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#fff;">
+                  <td style="padding:8px 14px;font-weight:600;"><code>DB_HOST=postgres-svc</code></td>
+                  <td style="padding:8px 14px;">K8s DNS resuelve el nombre del Service al ClusterIP automáticamente dentro del mismo namespace</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                  <td style="padding:8px 14px;font-weight:600;"><code>kubectl wait</code></td>
+                  <td style="padding:8px 14px;">Espera a que un Pod esté Ready antes de continuar — evita CrashLoopBackOff por dependencias de arranque</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;background:#fff;">
+                  <td style="padding:8px 14px;font-weight:600;">Stateless vs Stateful</td>
+                  <td style="padding:8px 14px;">Solo PostgreSQL tiene PVC; API y frontend escalan libremente sin disco</td>
+                </tr>
+                <tr style="background:#f8fafc;">
+                  <td style="padding:8px 14px;font-weight:600;"><code>imagePullPolicy: Never</code></td>
+                  <td style="padding:8px 14px;">Usa la imagen local de Docker Desktop — no intenta bajarla de un registry externo</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <ul class="task-list">
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Construir las dos imágenes Docker (<code>lab2-10-api:1.0</code> y <code>lab2-10-frontend:1.0</code>)</span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Desplegar PostgreSQL con PVC y verificar estado <code>Bound</code></span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Usar <code>kubectl wait</code> para asegurar que PostgreSQL esté listo antes de levantar la API</span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Abrir <code>localhost:30094</code> y hacer CRUD de productos desde el browser</span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Verificar los datos directamente en PostgreSQL con <code>kubectl exec psql</code></span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Demostrar persistencia: borrar Pods de API y confirmar que los datos sobreviven</span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Verificar balanceo de carga observando el hostname en <code>/api/hello</code></span><span class="ttag tt-lab">lab</span></li>
+            <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Explicar por qué solo PostgreSQL necesita PVC y qué significa que API y frontend sean stateless</span><span class="ttag tt-theory">teoría</span></li>
+          </ul>
+
+        </div>
+      </div>
+
       <!-- ─── 2.3 LAB 2-A ─── -->
       <div class="module">
         <div class="mod-header">
