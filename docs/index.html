@@ -6801,28 +6801,27 @@ ingress-nginx-controller   LoadBalancer   localhost     80:3xxxx/TCP, 443:3xxxx/
           </div>
         </div>
 
-        <!-- Lab overview boxes -->
         <div class="lab-overview">
-          <div class="lov-what">
+          <div class="lab-overview-box lov-what">
             <h4>¿Qué aprenderás?</h4>
             <ul>
               <li>Diferencia entre Ingress Resource e Ingress Controller</li>
               <li>Path-based routing: una URL, múltiples backends</li>
               <li>Anotaciones nginx: <code>rewrite-target</code> y <code>use-regex</code></li>
-              <li>Por qué los backends usan ClusterIP (no NodePort)</li>
+              <li>Por qué los backends usan ClusterIP y no NodePort</li>
               <li>ConfigMap como fuente de contenido estático para nginx</li>
               <li>Por qué Ingress API está congelada y qué viene después</li>
             </ul>
           </div>
-          <div class="lov-goals">
+          <div class="lab-overview-box lov-goals">
             <h4>¿Qué construirás?</h4>
             <ul>
               <li>Instalar <strong>ingress-nginx</strong> en Docker Desktop</li>
-              <li>Desplegar <strong>App Azul</strong> y <strong>App Verde</strong> (nginx + ConfigMap HTML)</li>
-              <li>Desplegar una <strong>API Node.js</strong> sin imagen custom (inline command)</li>
-              <li>Crear un <strong>Ingress</strong> que enrute <code>/blue/</code>, <code>/green/</code> y <code>/api/</code></li>
-              <li>Acceder a las 3 apps desde <code>http://localhost</code></li>
-              <li>Verificar load balancing entre réplicas de la API</li>
+              <li><strong>App Azul</strong> y <strong>App Verde</strong> con nginx + ConfigMap HTML</li>
+              <li>Una <strong>API Node.js</strong> sin imagen custom (inline command)</li>
+              <li>Un <strong>Ingress</strong> que enruta <code>/blue/</code>, <code>/green/</code> y <code>/api/</code></li>
+              <li>Las 3 apps accesibles desde <code>http://localhost</code></li>
+              <li>Load balancing entre réplicas de la API verificado</li>
             </ul>
           </div>
         </div>
@@ -6830,6 +6829,37 @@ ingress-nginx-controller   LoadBalancer   localhost     80:3xxxx/TCP, 443:3xxxx/
         <div class="lab-block">
           <div class="lab-header"><div class="lab-dot ld-green"></div><span class="lab-label">LAB 3-1 — Ingress path-based routing en Docker Desktop</span></div>
           <div class="lab-content">
+
+            <!-- Diagrama de arquitectura -->
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px 24px;margin-bottom:20px;">
+              <div style="font-size:.78rem;font-weight:700;letter-spacing:.08em;color:#64748b;text-transform:uppercase;margin-bottom:12px;">Arquitectura del Lab</div>
+              <pre style="background:none;border:none;padding:0;margin:0;font-size:.8rem;line-height:1.65;overflow-x:auto;">Browser → http://localhost:80
+         │
+         ▼
+┌──────────────────────────────────────────────────────┐
+│  ingress-nginx Controller  (namespace: ingress-nginx) │
+│                                                      │
+│  /blue(/|$)(.*)   ──→  rewrite /$2 ──→  blue-svc:80  │
+│  /green(/|$)(.*)  ──→  rewrite /$2 ──→  green-svc:80 │
+│  /api(/|$)(.*)    ──→  rewrite /$2 ──→  api-svc:3000 │
+└──────────────────────────────────────────────────────┘
+         │                  │                  │
+         ▼                  ▼                  ▼
+     blue-svc           green-svc           api-svc
+    (ClusterIP)         (ClusterIP)         (ClusterIP)
+         │                  │                  │
+   ┌─────┴─────┐      ┌─────┴─────┐      ┌─────┴─────┐
+   │ blue Pod  │      │ green Pod │      │  api Pod  │
+   │    ×2     │      │    ×2     │      │    ×2     │
+   │  nginx    │      │  nginx    │      │ node:20   │
+   │ ConfigMap │      │ ConfigMap │      │ inline JS │
+   └───────────┘      └───────────┘      └───────────┘
+                      namespace: lab3-1</pre>
+              <div style="margin-top:12px;font-size:.82rem;color:#475569;line-height:1.6;">
+                <strong>Clave:</strong> Los 3 Services son <code>ClusterIP</code> — sin acceso externo directo.
+                Todo el tráfico externo entra por el controller en el puerto 80 y se enruta internamente según el path.
+              </div>
+            </div>
 
             <div class="lab-step">
               <div class="step-num">1</div>
