@@ -7253,6 +7253,35 @@ PostgreSQL container (puerto 5432 en macOS host)
             </div>
 
             <div class="lab-step">
+              <div class="step-num">0</div>
+              <div class="step-body">
+                <div class="step-title">Verificar que ingress-nginx está instalado y corriendo</div>
+                <pre><span class="c"># Verificar controller corriendo</span>
+kubectl get pods -n ingress-nginx
+<span class="c"># NAME                                        READY   STATUS</span>
+<span class="c"># ingress-nginx-controller-xxxx               1/1     Running   ✅</span>
+
+<span class="c"># Verificar que el LoadBalancer expone localhost:80</span>
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+<span class="c"># NAME                       TYPE           EXTERNAL-IP   PORT(S)</span>
+<span class="c"># ingress-nginx-controller   LoadBalancer   localhost     80:...  ✅</span></pre>
+
+                <div style="background:#fef9c3;border-left:4px solid #eab308;border-radius:6px;padding:14px 16px;margin-top:12px;font-size:.85rem;">
+                  <strong>⚠️ Si no está instalado o el Pod no está en Running:</strong>
+                  <pre style="background:none;border:none;padding:0;margin:8px 0 0;font-size:.82rem;"><span class="c"># Instalar ingress-nginx (una sola vez por cluster)</span>
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
+
+<span class="c"># Esperar a que esté listo (~30s)</span>
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s</pre>
+                  <p style="margin:8px 0 0;">ingress-nginx es un componente de infraestructura compartido — <strong>se instala una vez y se reutiliza en todos los labs de la Sección 3</strong>.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="lab-step">
               <div class="step-num">1</div>
               <div class="step-body">
                 <div class="step-title">Reutilizar el PostgreSQL del Lab 0.1 — crear las bases de datos del lab</div>

@@ -53,11 +53,38 @@ k8s/
 ```bash
 # Kubernetes corriendo en Docker Desktop
 kubectl cluster-info
-
-# ingress-nginx instalado (del lab 3-1)
-kubectl get svc -n ingress-nginx
-# ingress-nginx-controller   LoadBalancer   localhost   80:...
 ```
+
+---
+
+## Step 0 — Verificar que ingress-nginx está instalado y corriendo
+
+```bash
+# Verificar controller corriendo
+kubectl get pods -n ingress-nginx
+# NAME                                        READY   STATUS
+# ingress-nginx-controller-xxxx               1/1     Running   ✅
+
+# Verificar que el LoadBalancer expone localhost:80
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+# NAME                       TYPE           EXTERNAL-IP   PORT(S)
+# ingress-nginx-controller   LoadBalancer   localhost     80:...  ✅
+```
+
+> Si no está instalado o el Pod no está en Running:
+
+```bash
+# Instalar ingress-nginx (una sola vez por cluster)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
+
+# Esperar a que esté listo (~30s)
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
+```
+
+ingress-nginx es un componente compartido — se instala una vez y se reutiliza en todos los labs de la Sección 3.
 
 ---
 
