@@ -61,28 +61,29 @@ kubectl get svc -n ingress-nginx
 
 ---
 
-## Step 1 — Levantar PostgreSQL en Docker (fuera de K8s)
+## Step 1 — Reutilizar postgres-lab del Lab 0.1
 
 ```bash
-# Iniciar PostgreSQL en Docker (simula BD corporativa externa)
-docker run -d \
-  --name lab3-postgres \
-  -e POSTGRES_USER=admin \
-  -e POSTGRES_PASSWORD=ninja123 \
-  -p 5432:5432 \
-  postgres:16-alpine
+# Verificar que el contenedor del Lab 0.1 está corriendo
+docker ps --filter name=postgres-lab --format "{{.Names}} — {{.Status}}"
+# postgres-lab — Up X minutes  ✅
 
-# Crear las dos bases de datos
-docker exec lab3-postgres psql -U admin -c "CREATE DATABASE customersdb;"
-docker exec lab3-postgres psql -U admin -c "CREATE DATABASE productsdb;"
+# Si no está corriendo:
+docker start postgres-lab
+
+# Crear las dos bases de datos nuevas (una por microservicio)
+docker exec postgres-lab psql -U admin -c "CREATE DATABASE customersdb;"
+docker exec postgres-lab psql -U admin -c "CREATE DATABASE productsdb;"
 
 # Verificar
-docker exec lab3-postgres psql -U admin -l
-#  customersdb  | admin
-#  productsdb   | admin
+docker exec postgres-lab psql -U admin -l
+#  labdb         | admin  (del Lab 0.1)
+#  customersdb   | admin  ✅
+#  productsdb    | admin  ✅
 ```
 
-> `host.docker.internal` es el hostname que Docker Desktop expone para que los Pods de K8s puedan alcanzar servicios del host Mac (incluyendo este contenedor PostgreSQL).
+> Reutilizamos `postgres-lab` (usuario `admin`, password `ninja123`, puerto `5432`). No hace falta levantar un contenedor nuevo.  
+> `host.docker.internal` es el hostname que Docker Desktop expone para que los Pods de K8s alcancen servicios del host Mac.
 
 ---
 
@@ -214,8 +215,7 @@ curl -s http://localhost/api/customers | python3 -c "import sys,json; [print(c['
 # Elimina todos los recursos de K8s del lab
 kubectl delete namespace lab3-2
 
-# Detener PostgreSQL Docker (opcional)
-docker stop lab3-postgres && docker rm lab3-postgres
+# postgres-lab lo dejamos corriendo — es compartido con Lab 0.1
 ```
 
 ---

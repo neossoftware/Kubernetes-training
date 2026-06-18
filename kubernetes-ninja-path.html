@@ -7255,17 +7255,23 @@ PostgreSQL container (puerto 5432 en macOS host)
             <div class="lab-step">
               <div class="step-num">1</div>
               <div class="step-body">
-                <div class="step-title">Levantar PostgreSQL en Docker (fuera del cluster)</div>
-                <pre>docker run -d   --name lab3-postgres   -e POSTGRES_USER=admin   -e POSTGRES_PASSWORD=ninja123   -p 5432:5432   postgres:16-alpine
+                <div class="step-title">Reutilizar el PostgreSQL del Lab 0.1 — crear las bases de datos del lab</div>
+                <pre><span class="c"># Verificar que postgres-lab (del Lab 0.1) está corriendo</span>
+docker ps --filter name=postgres-lab --format "{{.Names}} — {{.Status}}"
+<span class="c"># postgres-lab — Up X minutes  ✅</span>
+
+<span class="c"># Si no está corriendo, levántalo:</span>
+docker start postgres-lab
 
 <span class="c"># Crear las dos bases de datos — una por microservicio</span>
-docker exec lab3-postgres psql -U admin -c "CREATE DATABASE customersdb;"
-docker exec lab3-postgres psql -U admin -c "CREATE DATABASE productsdb;"
+docker exec postgres-lab psql -U admin -c "CREATE DATABASE customersdb;"
+docker exec postgres-lab psql -U admin -c "CREATE DATABASE productsdb;"
 
-docker exec lab3-postgres psql -U admin -l
-<span class="c">#  customersdb  | admin  ✅</span>
-<span class="c">#  productsdb   | admin  ✅</span></pre>
-                <p>Este PostgreSQL vive en Docker fuera del cluster. Los Pods lo alcanzan via <code>host.docker.internal:5432</code> — el hostname que Docker Desktop expone automáticamente para alcanzar el host Mac.</p>
+docker exec postgres-lab psql -U admin -l
+<span class="c">#  labdb         | admin  (del Lab 0.1)</span>
+<span class="c">#  customersdb   | admin  ✅</span>
+<span class="c">#  productsdb    | admin  ✅</span></pre>
+                <p>Reutilizamos el mismo contenedor <code>postgres-lab</code> del Lab 0.1 (usuario <code>admin</code>, password <code>ninja123</code>, puerto <code>5432</code>). Solo añadimos dos bases de datos nuevas. Los Pods de K8s lo alcanzan via <code>host.docker.internal:5432</code> — el hostname que Docker Desktop expone para alcanzar el host Mac desde dentro del cluster.</p>
               </div>
             </div>
 
@@ -7415,8 +7421,7 @@ kubectl logs -l app=products -n lab3-2 --tail=5
                 <pre><span class="c"># Elimina todos los recursos K8s del lab</span>
 kubectl delete namespace lab3-2
 
-<span class="c"># Detener PostgreSQL Docker (opcional — déjalo si harás más labs)</span>
-docker stop lab3-postgres && docker rm lab3-postgres</pre>
+<span class="c"># postgres-lab lo dejamos corriendo — es compartido con Lab 0.1 y otros labs</span></pre>
               </div>
             </div>
 
@@ -7424,7 +7429,7 @@ docker stop lab3-postgres && docker rm lab3-postgres</pre>
         </div>
 
         <ul class="task-list">
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Levantar PostgreSQL en Docker con customersdb y productsdb fuera de K8s</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Reutilizar postgres-lab (Lab 0.1) y crear customersdb y productsdb</span><span class="ttag tt-lab">lab</span></li>
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Entender por qué Ingress Prefix no necesita rewrite-target si Spring Boot usa context-path</span><span class="ttag tt-theory">teoría</span></li>
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Construir y desplegar customers-api y products-api como microservicios independientes</span><span class="ttag tt-lab">lab</span></li>
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">✅ Lab 3-2: Frontend React + 2 microservicios Spring Boot accesibles desde http://localhost</span><span class="ttag tt-lab">lab</span></li>
