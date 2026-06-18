@@ -6668,147 +6668,314 @@ kubectl get namespaces | grep lab2-10  <span class="c"># ya no aparece</span></p
           <span class="mod-duration">Semana 6 — Teoría + Lab</span>
         </div>
 
-        <div class="theory-block green">
-          <div class="theory-header"><span class="theory-tag green">Teoría</span><span class="theory-title">¿Qué es Ingress y por qué es mejor que LoadBalancer?</span></div>
+        <!-- ⚠️ Ingress API frozen warning -->
+        <div class="theory-block yellow">
+          <div class="theory-header"><span class="theory-tag yellow">⚠️ Nota oficial de Kubernetes</span><span class="theory-title">La API de Ingress está congelada — Gateway API es el futuro</span></div>
           <div class="theory-body">
-            <p>Si tienes 10 microservicios y cada uno usa un Service de tipo LoadBalancer, tienes 10 IPs públicas y 10 facturas del cloud provider. Costoso y difícil de gestionar.</p>
-            <p>Un <strong>Ingress</strong> es un único punto de entrada HTTP/HTTPS al cluster que enruta el tráfico a diferentes Services según reglas (por path, por hostname). Un solo Load Balancer para todas tus apps.</p>
-            <p>El <strong>Ingress Controller</strong> es el componente que implementa las reglas del Ingress. El más popular es <code>ingress-nginx</code> (nginx como proxy reverso). Otros: Traefik, HAProxy, Kong, AWS ALB Ingress Controller.</p>
-            <p>El Ingress también puede manejar: terminación TLS (certificados SSL), rate limiting, autenticación básica, redirects, rewrites de URLs, CORS headers, y más — todo con anotaciones.</p>
+            <p>Desde la documentación oficial de Kubernetes (<a href="https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/" target="_blank" style="color:#92400e;">kubernetes.io/docs/concepts/services-networking/ingress-controllers/</a>):</p>
+            <blockquote style="border-left:3px solid #f59e0b;margin:12px 0;padding:10px 16px;background:#fef3c7;border-radius:0 6px 6px 0;font-style:italic;color:#78350f;">
+              "The Kubernetes project recommends using Gateway instead of Ingress. The Ingress API has been frozen."
+            </blockquote>
+            <p>Esto significa que:</p>
+            <ul>
+              <li>La API de Ingress <strong>no va a ser eliminada</strong> — sigue siendo Generally Available y estable.</li>
+              <li>La API de Ingress <strong>no va a recibir nuevas funcionalidades</strong> — está congelada.</li>
+              <li><strong>Gateway API</strong> es el sucesor oficial: más expresivo, más potente, soporta TCP/UDP/gRPC además de HTTP.</li>
+            </ul>
+            <p><strong>¿Por qué enseñamos Ingress aquí?</strong> Porque hoy el 90 % de los clusters en producción usan Ingress (nginx-ingress-controller, Traefik, Kong, AWS ALB). La transición a Gateway API existe pero es gradual. Si trabajas en K8s en los próximos 2–3 años, vas a encontrar Ingress. Aprenderás a leer y escribir Ingress manifests, y al final del módulo verás qué cambia con Gateway API.</p>
+          </div>
+        </div>
+
+        <!-- Teoría 1: El problema que resuelve -->
+        <div class="theory-block green">
+          <div class="theory-header"><span class="theory-tag green">Teoría</span><span class="theory-title">El problema que resuelve Ingress</span></div>
+          <div class="theory-body">
+            <p>Antes de Ingress, para exponer 3 apps necesitabas 3 Services de tipo <strong>NodePort</strong> (o 3 LoadBalancers en cloud). El browser tenía que conocer puertos distintos para cada app:</p>
+            <pre style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:14px;font-size:.82rem;overflow-x:auto;">SIN INGRESS — múltiples puertos expuestos:
+
+Browser → http://localhost:30080  →  NodePort  →  blue-svc  →  App Azul
+Browser → http://localhost:30081  →  NodePort  →  green-svc →  App Verde
+Browser → http://localhost:30082  →  NodePort  →  api-svc   →  Node API
+
+Problema: el cliente conoce puertos internos, difícil de gestionar TLS,
+          no hay routing inteligente, cada microservicio = un puerto.</pre>
+
+            <p style="margin-top:14px;">Con Ingress, un único punto de entrada en el puerto 80/443 enruta internamente según la URL:</p>
+            <pre style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:14px;font-size:.82rem;overflow-x:auto;">CON INGRESS — un solo punto de entrada:
+
+                    http://localhost
+                           │
+               ┌───────────┼───────────┐
+               │           │           │
+            /blue/       /green/     /api/
+               │           │           │
+           blue-svc    green-svc    api-svc
+          (ClusterIP) (ClusterIP) (ClusterIP)
+               │           │           │
+           App Azul    App Verde    Node API
+
+✅ Un solo puerto público · TLS centralizado · routing por URL</pre>
+          </div>
+        </div>
+
+        <!-- Teoría 2: Arquitectura Ingress Resource vs Controller -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Ingress Resource vs Ingress Controller — son dos cosas distintas</span></div>
+          <div class="theory-body">
+            <p>Este es el punto de confusión más común. Son componentes separados:</p>
+            <ul>
+              <li><strong>Ingress Resource</strong> — el YAML que defines tú. Describe las <em>reglas</em>: qué path va a qué Service. K8s lo almacena en etcd como cualquier otro objeto, pero <strong>por sí solo no hace nada</strong>.</li>
+              <li><strong>Ingress Controller</strong> — un Pod que corre en el cluster, observa los Ingress Resources y configura nginx (u otro proxy) en tiempo real para implementar las reglas. Debes instalarlo tú — no viene por defecto en K8s.</li>
+            </ul>
+            <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:14px;font-size:.82rem;overflow-x:auto;">Flujo de una petición:
+
+Browser GET http://localhost/blue/
+  │
+  ▼
+ingress-nginx Controller Pod  (namespace: ingress-nginx)
+  │  lee el Ingress Resource "lab3-1-ingress"
+  │  encuentra regla: path=/blue(/|$)(.*) → backend: blue-svc:80
+  │  reescribe path: /blue/pagina → /pagina  (rewrite-target)
+  ▼
+blue-svc:80  (ClusterIP — invisible desde fuera)
+  │  kube-proxy balancea entre los Pods del Deployment
+  ▼
+blue Pod  (nginx:1.25-alpine sirviendo HTML del ConfigMap)
+  │
+  ◀── HTTP 200 ─────────────────────────────────────────</pre>
+            <p style="margin-top:10px;"><strong>Controllers más usados:</strong> <code>ingress-nginx</code> (el más popular, nginx como proxy), Traefik, Kong, HAProxy, AWS ALB Ingress Controller, GCE Ingress Controller.</p>
+          </div>
+        </div>
+
+        <!-- Teoría 3: Tipos de routing -->
+        <div class="theory-block purple">
+          <div class="theory-header"><span class="theory-tag purple">Teoría</span><span class="theory-title">Path-based vs Host-based routing</span></div>
+          <div class="theory-body">
+            <p>Hay dos estrategias principales para enrutar con Ingress:</p>
+            <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+              <thead><tr style="background:#ede9fe;"><th style="padding:8px 12px;text-align:left;">Tipo</th><th style="padding:8px 12px;text-align:left;">Cómo funciona</th><th style="padding:8px 12px;text-align:left;">Cuándo usarlo</th></tr></thead>
+              <tbody>
+                <tr style="border-top:1px solid #ddd6fe;"><td style="padding:8px 12px;"><strong>Path-based</strong></td><td style="padding:8px 12px;"><code>localhost/app1</code> → svc1<br><code>localhost/app2</code> → svc2</td><td style="padding:8px 12px;">Desarrollo local, microservicios bajo el mismo dominio</td></tr>
+                <tr style="border-top:1px solid #ddd6fe;"><td style="padding:8px 12px;"><strong>Host-based</strong></td><td style="padding:8px 12px;"><code>app1.empresa.com</code> → svc1<br><code>app2.empresa.com</code> → svc2</td><td style="padding:8px 12px;">Producción, cada producto tiene su propio subdominio</td></tr>
+              </tbody>
+            </table>
+            <pre style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;padding:14px;font-size:.82rem;margin-top:12px;overflow-x:auto;"># Path-based (este lab):
+spec:
+  rules:
+    - http:                      # sin host: → aplica a cualquier dominio
+        paths:
+          - path: /blue(/|$)(.*)
+            backend: { service: { name: blue-svc } }
+
+# Host-based (producción):
+spec:
+  rules:
+    - host: blue.empresa.com
+      http:
+        paths:
+          - path: /
+            backend: { service: { name: blue-svc } }
+    - host: green.empresa.com
+      http:
+        paths:
+          - path: /
+            backend: { service: { name: green-svc } }</pre>
+          </div>
+        </div>
+
+        <!-- Teoría 4: Instalación en Docker Desktop -->
+        <div class="theory-block orange">
+          <div class="theory-header"><span class="theory-tag orange">Teoría</span><span class="theory-title">ingress-nginx en Docker Desktop — por qué funciona en localhost</span></div>
+          <div class="theory-body">
+            <p>Docker Desktop tiene una integración especial: cuando creas un Service de tipo <code>LoadBalancer</code>, Docker mapea automáticamente ese Service a <code>localhost</code> en tu Mac. El Ingress Controller aprovecha esto:</p>
+            <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:14px;font-size:.82rem;overflow-x:auto;">kubectl get svc -n ingress-nginx
+NAME                       TYPE           EXTERNAL-IP   PORT(S)
+ingress-nginx-controller   LoadBalancer   localhost     80:3xxxx/TCP, 443:3xxxx/TCP
+                                          ▲
+                                 Docker Desktop mapea
+                                 localhost:80 al controller</pre>
+            <p>En producción (AWS/GCP/Azure) el mismo comando crea una IP pública real (ELB, ALB, etc.) — el manifest YAML no cambia.</p>
+            <p><strong>Comando de instalación para Docker Desktop:</strong></p>
+            <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:14px;font-size:.82rem;overflow-x:auto;">kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml</pre>
+            <p>Nota: usa el provider <code>cloud</code> (no <code>baremetal</code>) porque Docker Desktop soporta LoadBalancer nativo.</p>
+          </div>
+        </div>
+
+        <!-- Lab overview boxes -->
+        <div class="lab-overview">
+          <div class="lov-what">
+            <h4>¿Qué aprenderás?</h4>
+            <ul>
+              <li>Diferencia entre Ingress Resource e Ingress Controller</li>
+              <li>Path-based routing: una URL, múltiples backends</li>
+              <li>Anotaciones nginx: <code>rewrite-target</code> y <code>use-regex</code></li>
+              <li>Por qué los backends usan ClusterIP (no NodePort)</li>
+              <li>ConfigMap como fuente de contenido estático para nginx</li>
+              <li>Por qué Ingress API está congelada y qué viene después</li>
+            </ul>
+          </div>
+          <div class="lov-goals">
+            <h4>¿Qué construirás?</h4>
+            <ul>
+              <li>Instalar <strong>ingress-nginx</strong> en Docker Desktop</li>
+              <li>Desplegar <strong>App Azul</strong> y <strong>App Verde</strong> (nginx + ConfigMap HTML)</li>
+              <li>Desplegar una <strong>API Node.js</strong> sin imagen custom (inline command)</li>
+              <li>Crear un <strong>Ingress</strong> que enrute <code>/blue/</code>, <code>/green/</code> y <code>/api/</code></li>
+              <li>Acceder a las 3 apps desde <code>http://localhost</code></li>
+              <li>Verificar load balancing entre réplicas de la API</li>
+            </ul>
           </div>
         </div>
 
         <div class="lab-block">
-          <div class="lab-header"><div class="lab-dot ld-green"></div><span class="lab-label">LAB 3-A — React + Angular + FastAPI con Ingress path-based routing</span></div>
+          <div class="lab-header"><div class="lab-dot ld-green"></div><span class="lab-label">LAB 3-1 — Ingress path-based routing en Docker Desktop</span></div>
           <div class="lab-content">
 
             <div class="lab-step">
               <div class="step-num">1</div>
               <div class="step-body">
-                <div class="step-title">Habilitar Ingress en minikube</div>
-                <pre>minikube addons enable ingress
-<span class="c"># Verificar que el controller está corriendo</span>
-kubectl get pods -n ingress-nginx
-<span class="c"># Esperar hasta que esté Running</span>
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=120s</pre>
+                <div class="step-title">Instalar ingress-nginx</div>
+                <pre>kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+
+<span class="c"># Esperar a que el controller esté listo (≈60s la primera vez)</span>
+kubectl wait --namespace ingress-nginx   --for=condition=ready pod   --selector=app.kubernetes.io/component=controller   --timeout=120s
+<span class="c"># pod/ingress-nginx-controller-xxxx condition met</span>
+
+kubectl get svc -n ingress-nginx
+<span class="c"># NAME                       TYPE           EXTERNAL-IP   PORT(S)</span>
+<span class="c"># ingress-nginx-controller   LoadBalancer   localhost     80:3xxxx/TCP,443:3xxxx/TCP</span></pre>
+                <p>El <code>EXTERNAL-IP=localhost</code> confirma que Docker Desktop ya está mapeando el puerto 80 a tu máquina.</p>
               </div>
             </div>
 
             <div class="lab-step">
               <div class="step-num">2</div>
               <div class="step-body">
-                <div class="step-title">Crear App Angular mínima para el lab</div>
-                <pre>ng new lab3-angular --routing=false --style=css --skip-tests
-cd lab3-angular</pre>
+                <div class="step-title">Entrar a la carpeta del lab y crear el namespace</div>
+                <pre>cd section03-network-ingress-helm/lab-3-1-ingress
 
-                <span class="filename">src/app/app.component.html</span>
-                <pre>&lt;div style="max-width:600px;margin:40px auto;font-family:Inter,sans-serif;padding:20px"&gt;
-  &lt;h1 style="color:#7c3aed"&gt;🅰️ Angular App — K8s Lab 3&lt;/h1&gt;
-  &lt;p style="color:#64748b"&gt;Sirviendo desde path /app2 en Kubernetes&lt;/p&gt;
-  &lt;div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:16px;margin-top:16px"&gt;
-    &lt;strong&gt;Hostname del pod:&lt;/strong&gt; {{ hostname }}
-  &lt;/div&gt;
-&lt;/div&gt;</pre>
-
-                <span class="filename">src/app/app.component.ts</span>
-                <pre>import { Component, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-
-@Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html'
-})
-export class AppComponent implements OnInit {
-  hostname = 'cargando...';
-  constructor(private http: HttpClient) {}
-  ngOnInit() {
-    this.http.get&lt;any&gt;('/api/hello')
-      .subscribe(data => this.hostname = data.hostname || 'desconocido');
-  }
-}</pre>
-
-                <span class="filename">Dockerfile (Angular)</span>
-                <pre>FROM node:20-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build -- --base-href=/app2/
-
-FROM nginx:1.25-alpine
-COPY --from=build /app/dist/lab3-angular /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80</pre>
+kubectl apply -f k8s/namespace.yaml
+<span class="c"># namespace/lab3-1 created</span></pre>
               </div>
             </div>
 
             <div class="lab-step">
               <div class="step-num">3</div>
               <div class="step-body">
-                <div class="step-title">Manifests K8s — Ingress unificado</div>
-                <span class="filename">k8s/ingress.yaml</span>
-                <pre>apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: apps-ingress
-  namespace: labs
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: lab.local
-      http:
-        paths:
-          <span class="c"># React app en /app1</span>
-          - path: /app1(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: react-svc
-                port:
-                  number: 80
-          <span class="c"># Angular app en /app2</span>
-          - path: /app2(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: angular-svc
-                port:
-                  number: 80
-          <span class="c"># Node API en /api</span>
-          - path: /api(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: node-api-svc
-                port:
-                  number: 80</pre>
-
-                <pre><span class="c"># Agregar al /etc/hosts local para resolver lab.local</span>
-echo "$(minikube ip)  lab.local" | sudo tee -a /etc/hosts
-
-kubectl apply -f k8s/
-
-<span class="c"># Probar rutas</span>
-curl http://lab.local/app1/
-curl http://lab.local/app2/
-curl http://lab.local/api/hello</pre>
+                <div class="step-title">Desplegar App Azul (ConfigMap + nginx)</div>
+                <pre>kubectl apply -f k8s/blue-app.yaml
+<span class="c"># configmap/blue-html created</span>
+<span class="c"># deployment.apps/blue-app created</span>
+<span class="c"># service/blue-svc created</span></pre>
+                <p>El contenido HTML viene de un <strong>ConfigMap</strong> montado como volumen en nginx. No se construye ninguna imagen — patrón muy común para contenido estático en K8s.</p>
               </div>
             </div>
+
+            <div class="lab-step">
+              <div class="step-num">4</div>
+              <div class="step-body">
+                <div class="step-title">Desplegar App Verde</div>
+                <pre>kubectl apply -f k8s/green-app.yaml
+<span class="c"># configmap/green-html created</span>
+<span class="c"># deployment.apps/green-app created</span>
+<span class="c"># service/green-svc created</span></pre>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">5</div>
+              <div class="step-body">
+                <div class="step-title">Desplegar la API Node.js (sin imagen custom)</div>
+                <pre>kubectl apply -f k8s/api.yaml
+<span class="c"># deployment.apps/api created</span>
+<span class="c"># service/api-svc created</span>
+
+kubectl logs -l app=api -n lab3-1 --tail=2
+<span class="c"># API running on :3000</span></pre>
+                <p>La API usa <code>node:20-alpine</code> con el servidor HTTP escrito inline en el <code>command</code> del Pod. No necesita Dockerfile ni docker build.</p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">6</div>
+              <div class="step-body">
+                <div class="step-title">Crear el Ingress</div>
+                <pre>kubectl apply -f k8s/ingress.yaml
+<span class="c"># ingress.networking.k8s.io/lab3-1-ingress created</span>
+
+kubectl get ingress -n lab3-1
+<span class="c"># NAME             CLASS   HOSTS   ADDRESS     PORTS   AGE</span>
+<span class="c"># lab3-1-ingress   nginx   *       localhost   80      10s</span></pre>
+                <p><code>HOSTS=*</code> → aplica a cualquier hostname, incluido <code>localhost</code>. No necesitas modificar <code>/etc/hosts</code>.</p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">7</div>
+              <div class="step-body">
+                <div class="step-title">Probar el routing</div>
+                <pre><span class="c"># App Azul</span>
+curl -s http://localhost/blue/ | grep -o "&lt;title&gt;.*&lt;/title&gt;"
+<span class="c"># &lt;title&gt;App Azul — Lab 3-1&lt;/title&gt;</span>
+
+<span class="c"># App Verde</span>
+curl -s http://localhost/green/ | grep -o "&lt;title&gt;.*&lt;/title&gt;"
+<span class="c"># &lt;title&gt;App Verde — Lab 3-1&lt;/title&gt;</span>
+
+<span class="c"># API JSON</span>
+curl -s http://localhost/api/ | python3 -m json.tool
+<span class="c"># {</span>
+<span class="c">#   "message": "API Lab 3-1 - Ingress routing demo",</span>
+<span class="c">#   "hostname": "api-xxxx-aaaa",</span>
+<span class="c">#   "path": "/",</span>
+<span class="c">#   "timestamp": "2026-06-17T..."</span>
+<span class="c"># }</span></pre>
+                <p>También abre en el browser: <strong>http://localhost/blue/</strong> y <strong>http://localhost/green/</strong></p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">8</div>
+              <div class="step-body">
+                <div class="step-title">Verificar load balancing entre réplicas de la API</div>
+                <pre><span class="c"># El hostname rota entre los 2 Pods de la API</span>
+for i in $(seq 1 6); do
+  curl -s http://localhost/api/ | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['hostname'])"
+done
+<span class="c"># api-xxxx-aaaa</span>
+<span class="c"># api-xxxx-bbbb</span>
+<span class="c"># api-xxxx-aaaa</span>
+<span class="c"># api-xxxx-bbbb</span></pre>
+                <p>Ingress Controller balancea el tráfico entre las 2 réplicas — ninguno de los backends tiene IP pública, todo pasa por el controller.</p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">9</div>
+              <div class="step-body">
+                <div class="step-title">Limpiar</div>
+                <pre><span class="c"># Elimina namespace + todos sus recursos (Pods, Services, ConfigMaps, Ingress)</span>
+kubectl delete namespace lab3-1
+<span class="c"># namespace "lab3-1" deleted</span>
+
+<span class="c"># El ingress-nginx controller puede quedar instalado para labs siguientes</span>
+<span class="c"># Si quieres desinstalarlo:</span>
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml</pre>
+              </div>
+            </div>
+
           </div>
         </div>
 
         <ul class="task-list">
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Entender Ingress: path routing, host routing, diferencia con LoadBalancer, anotaciones nginx</span><span class="ttag tt-theory">teoría</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">✅ Lab 3-A: React + Angular + Node API accesibles desde un solo Ingress con path routing</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Instalar ingress-nginx en Docker Desktop y verificar EXTERNAL-IP=localhost</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Entender Ingress Resource vs Ingress Controller — son dos componentes distintos</span><span class="ttag tt-theory">teoría</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Desplegar App Azul, App Verde y API con ClusterIP Services (sin NodePort)</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear Ingress con path-based routing y rewrite-target</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">✅ Lab 3-1: /blue/, /green/ y /api/ accesibles desde http://localhost</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Verificar load balancing entre réplicas de la API con hostname rotando</span><span class="ttag tt-lab">lab</span></li>
         </ul>
       </div>
-
       <div class="module">
         <div class="mod-header">
           <span class="mod-icon">⚓</span>
