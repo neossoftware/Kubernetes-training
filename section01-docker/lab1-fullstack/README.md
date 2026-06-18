@@ -20,7 +20,7 @@
 └───────────┼──────────────────────────────────────┘
             │
      Host: localhost
-      :80 (frontend)
+      :8081 (frontend)
       :3000 (api)
 ```
 
@@ -107,7 +107,7 @@ frontend:
       VITE_API_URL: http://localhost:3000
   container_name: lab1-frontend
   ports:
-    - "80:80"
+    - "8081:80"
   networks:
     - lab1-net
   depends_on:
@@ -119,7 +119,7 @@ frontend:
 | Campo | Qué hace |
 |---|---|
 | `build.args` | Pasa `VITE_API_URL` al `Dockerfile` en tiempo de build (se incrusta en el JS compilado) |
-| `ports: "80:80"` | El frontend queda disponible en `http://localhost` |
+| `ports: "8081:80"` | El frontend queda disponible en `http://localhost:8081` |
 | `depends_on` | Docker Compose no arranca el frontend hasta que la API esté `healthy` |
 
 > **`condition: service_healthy`** es más estricto que `depends_on` simple.  
@@ -174,14 +174,14 @@ Espera ver ambos en estado `running (healthy)` / `running`:
 ```
 NAME             STATUS                   PORTS
 lab1-api         Up X seconds (healthy)   0.0.0.0:3000->3000/tcp
-lab1-frontend    Up X seconds             0.0.0.0:80->80/tcp
+lab1-frontend    Up X seconds             0.0.0.0:8081->80/tcp
 ```
 
 ### 3. Probar
 
 | URL | Qué abre |
 |---|---|
-| `http://localhost` | Interfaz React (frontend) |
+| `http://localhost:8081` | Interfaz React (frontend) |
 | `http://localhost:3000/api/hello` | Health check de la API |
 | `http://localhost:3000/api/products` | API directa (JSON) |
 

@@ -1571,7 +1571,7 @@ services:
         VITE_API_URL: ""   <span class="c"># same-origin — nginx proxy_pass a api:3000</span>
     container_name: lab1-frontend
     ports:
-      - "80:80"
+      - "8081:80"
     networks:
       - lab1-net
     depends_on:
@@ -1597,8 +1597,8 @@ curl http://localhost:3000/api/hello
 curl http://localhost:3000/api/products
 
 <span class="c"># Visitar el frontend</span>
-open http://localhost   <span class="c"># macOS</span>
-xdg-open http://localhost  <span class="c"># Linux</span>
+open http://localhost:8081   <span class="c"># macOS</span>
+xdg-open http://localhost:8081  <span class="c"># Linux</span>
 
 <span class="c"># Bajar todo</span>
 docker compose down</pre>
