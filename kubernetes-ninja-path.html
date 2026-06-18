@@ -6865,10 +6865,57 @@ ingress-nginx-controller   LoadBalancer   localhost     80:3xxxx/TCP, 443:3xxxx/
               <div class="step-num">1</div>
               <div class="step-body">
                 <div class="step-title">Instalar ingress-nginx</div>
-                <pre>kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+                <pre>kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml</pre>
 
-<span class="c"># Esperar a que el controller esté listo (≈60s la primera vez)</span>
-kubectl wait --namespace ingress-nginx   --for=condition=ready pod   --selector=app.kubernetes.io/component=controller   --timeout=120s
+                <p>Verás este output — es lo esperado. Cada línea es un recurso que Kubernetes creó para que el controller funcione:</p>
+
+                <pre>namespace/ingress-nginx created
+serviceaccount/ingress-nginx created
+serviceaccount/ingress-nginx-admission created
+role.rbac.authorization.k8s.io/ingress-nginx created
+role.rbac.authorization.k8s.io/ingress-nginx-admission created
+clusterrole.rbac.authorization.k8s.io/ingress-nginx created
+clusterrole.rbac.authorization.k8s.io/ingress-nginx-admission created
+rolebinding.rbac.authorization.k8s.io/ingress-nginx created
+rolebinding.rbac.authorization.k8s.io/ingress-nginx-admission created
+clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx created
+clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx-admission created
+configmap/ingress-nginx-controller created
+service/ingress-nginx-controller created
+service/ingress-nginx-controller-admission created
+deployment.apps/ingress-nginx-controller created
+job.batch/ingress-nginx-admission-create created
+job.batch/ingress-nginx-admission-patch created
+ingressclass.networking.k8s.io/nginx created
+validatingwebhookconfiguration.admissionregistration.k8s.io/ingress-nginx-admission created</pre>
+
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin:12px 0;">
+                  <div style="font-size:.75rem;font-weight:700;letter-spacing:.07em;color:#64748b;text-transform:uppercase;margin-bottom:10px;">¿Qué creó Kubernetes y por qué?</div>
+                  <table style="width:100%;border-collapse:collapse;font-size:.83rem;">
+                    <thead><tr style="background:#f1f5f9;"><th style="padding:7px 10px;text-align:left;border-radius:4px 0 0 4px;">Recurso</th><th style="padding:7px 10px;text-align:left;">Por qué existe</th></tr></thead>
+                    <tbody>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>namespace/ingress-nginx</code></td><td style="padding:7px 10px;">Aísla todos los recursos del controller en su propio namespace — no contamina el tuyo</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>serviceaccount/ingress-nginx</code></td><td style="padding:7px 10px;">Identidad del Pod del controller dentro del cluster. Sin ella K8s no sabe quién está haciendo las llamadas a la API</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>serviceaccount/ingress-nginx-admission</code></td><td style="padding:7px 10px;">Identidad separada para los Jobs del webhook de validación</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>role / clusterrole</code></td><td style="padding:7px 10px;"><strong>RBAC:</strong> define <em>qué puede hacer</em> el controller. El <code>ClusterRole</code> le da acceso de lectura a los objetos <code>Ingress</code> de <strong>todos</strong> los namespaces — imprescindible, porque tus Ingress viven en <code>lab3-1</code>, no en <code>ingress-nginx</code></td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>rolebinding / clusterrolebinding</code></td><td style="padding:7px 10px;"><strong>RBAC:</strong> vincula los roles anteriores al ServiceAccount. Sin el binding el rol no se aplica a nadie</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>configmap/ingress-nginx-controller</code></td><td style="padding:7px 10px;">Configuración global de nginx (timeouts, buffer sizes, log format). Se puede personalizar sin reconstruir la imagen</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>service/ingress-nginx-controller</code></td><td style="padding:7px 10px;">Tipo <code>LoadBalancer</code> — Docker Desktop lo mapea automáticamente a <code>localhost:80</code>. Es el único punto de entrada externo al cluster</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>service/ingress-nginx-controller-admission</code></td><td style="padding:7px 10px;">Expone el webhook de validación internamente. Solo lo llama el API Server de K8s, nunca el browser</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>deployment.apps/ingress-nginx-controller</code></td><td style="padding:7px 10px;">El Pod real: nginx corriendo como proxy reverso, observando los objetos <code>Ingress</code> y reconfigurándose en tiempo real cuando cambian</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>job.batch/ingress-nginx-admission-create</code></td><td style="padding:7px 10px;">Job de un solo disparo: genera el certificado TLS para el webhook de validación</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>job.batch/ingress-nginx-admission-patch</code></td><td style="padding:7px 10px;">Job de un solo disparo: inyecta el certificado en el <code>ValidatingWebhookConfiguration</code> para que el API Server confíe en él</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>ingressclass.networking.k8s.io/nginx</code></td><td style="padding:7px 10px;">Registra el nombre <code>nginx</code> como clase de Ingress. Cuando tu YAML dice <code>ingressClassName: nginx</code>, este objeto es lo que hace la conexión con el controller</td></tr>
+                      <tr style="border-top:1px solid #e2e8f0;"><td style="padding:7px 10px;"><code>validatingwebhookconfiguration/ingress-nginx-admission</code></td><td style="padding:7px 10px;">Intercepta cada <code>kubectl apply</code> de un Ingress y lo valida antes de guardarlo en etcd. Si hay un error en tu YAML, lo rechaza con un mensaje claro en lugar de crear un Ingress roto</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <pre><span class="c"># Esperar a que el controller esté listo (≈60s la primera vez)</span>
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
 <span class="c"># pod/ingress-nginx-controller-xxxx condition met</span>
 
 kubectl get svc -n ingress-nginx
