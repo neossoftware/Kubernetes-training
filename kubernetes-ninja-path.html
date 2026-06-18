@@ -7086,6 +7086,23 @@ sleep 5 && curl -s http://localhost/blue/ | grep -o "&lt;title&gt;.*&lt;/title&g
 <span class="c"># &lt;title&gt;App Azul — Lab 3-1&lt;/title&gt;  ✅</span></pre>
             <p><strong>Regla general:</strong> antes de usar Ingress en Kubernetes, asegúrate de que ningún contenedor Docker tenga el puerto 80 mapeado con <code>docker ps</code>.</p>
 
+            <p style="margin-top:14px;"><strong>¿Por qué Kubernetes no avisó del conflicto?</strong></p>
+            <p>Porque K8s y el ingress-nginx controller viven dentro de una <strong>VM Linux</strong> que Docker Desktop corre en tu Mac. Desde dentro de esa VM el puerto 80 está libre — el contenedor <code>lab1-frontend</code> existe en el host macOS, no dentro de la VM. K8s no puede ver el host.</p>
+            <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:12px;font-size:.82rem;">macOS host
+├── lab1-frontend (Docker container) → 0.0.0.0:80  ← bind en el host, ganó primero
+│
+└── Docker Desktop VM (Linux)
+    └── ingress-nginx Pod → LoadBalancer :80
+          │
+          └── Docker Desktop daemon intenta hacer
+              forwarding VM:80 → macOS:80 ... puerto ocupado
+              ↳ falla silenciosamente, sin error ni warning
+
+kubectl get svc → EXTERNAL-IP=localhost  ✅ (K8s lo marca OK igualmente)
+curl http://localhost/blue/ → responde lab1-frontend  ❌ (el contenedor llega primero)</pre>
+            <p><code>kubectl apply</code> solo crea objetos en etcd — no verifica si el puerto del host macOS está libre. Y <code>kubectl get svc</code> muestra <code>EXTERNAL-IP=localhost</code> de todas formas, porque ese valor lo escribe Docker Desktop como anotación, independientemente de si el forwarding funcionó.</p>
+            <p>En producción (AWS/GCP/Azure) esto no ocurre — el LoadBalancer es un recurso externo real con su propia IP pública, completamente separado de cualquier contenedor local.</p>
+
             <p style="margin-top:16px;"><strong>El log dice "ContainerCreating" al hacer kubectl logs</strong></p>
             <p>El comando <code>kubectl logs</code> falla si el container aún no arrancó. Espera a que el Pod esté <code>Running</code> y vuelve a intentarlo:</p>
             <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:12px;font-size:.82rem;"><span class="c"># Error que verás si el Pod no está listo:</span>
