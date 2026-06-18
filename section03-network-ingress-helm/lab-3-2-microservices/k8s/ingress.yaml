@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lab3-2-ingress
+  namespace: lab3-2
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Spring Boot tiene context-path=/api, así que /api/customers llega intacto
+          - path: /api/customers
+            pathType: Prefix
+            backend:
+              service:
+                name: customers-svc
+                port:
+                  number: 8080
+          - path: /api/products
+            pathType: Prefix
+            backend:
+              service:
+                name: products-svc
+                port:
+                  number: 8080
+          # Frontend atrapa todo lo demás — rutas más específicas tienen prioridad
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-svc
+                port:
+                  number: 80
