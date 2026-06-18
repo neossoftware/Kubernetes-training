@@ -7071,6 +7071,21 @@ kubectl rollout restart deployment/blue-app -n lab3-1
 kubectl rollout restart deployment/green-app -n lab3-1
 kubectl rollout restart deployment/api -n lab3-1</pre>
 
+            <p style="margin-top:16px;"><strong>curl devuelve HTML de un lab anterior en lugar de tu app</strong></p>
+            <p>Si <code>http://localhost/blue/</code> devuelve algo distinto a la App Azul (por ejemplo el frontend React de un lab anterior), hay un <strong>contenedor Docker clásico tomando el puerto 80</strong> antes de que el ingress-nginx pueda recibirlo. Los contenedores de Docker Compose de labs anteriores pueden quedar corriendo aunque hayas limpiado Kubernetes.</p>
+            <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:12px;font-size:.82rem;"><span class="c"># Verificar qué tiene el puerto 80 en Docker</span>
+docker ps --format "table {{.Names}}\t{{.Ports}}" | grep ":80"
+<span class="c"># Si ves algo como:</span>
+<span class="c"># lab1-frontend   0.0.0.0:80->80/tcp   ← este bloquea el ingress</span>
+
+<span class="c"># Detenerlo:</span>
+docker stop lab1-frontend   <span class="c"># (o el nombre que aparezca)</span>
+
+<span class="c"># Esperar 5 segundos para que Docker Desktop remapee el puerto al ingress-nginx:</span>
+sleep 5 && curl -s http://localhost/blue/ | grep -o "&lt;title&gt;.*&lt;/title&gt;"
+<span class="c"># &lt;title&gt;App Azul — Lab 3-1&lt;/title&gt;  ✅</span></pre>
+            <p><strong>Regla general:</strong> antes de usar Ingress en Kubernetes, asegúrate de que ningún contenedor Docker tenga el puerto 80 mapeado con <code>docker ps</code>.</p>
+
             <p style="margin-top:16px;"><strong>El log dice "ContainerCreating" al hacer kubectl logs</strong></p>
             <p>El comando <code>kubectl logs</code> falla si el container aún no arrancó. Espera a que el Pod esté <code>Running</code> y vuelve a intentarlo:</p>
             <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:12px;font-size:.82rem;"><span class="c"># Error que verás si el Pod no está listo:</span>
