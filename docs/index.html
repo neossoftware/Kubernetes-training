@@ -6643,67 +6643,6 @@ kubectl get namespaces | grep lab2-10  <span class="c"># ya no aparece</span></p
 
       </div>
 
-      <!-- ─── 2.4 ConfigMaps y Secrets ─── -->
-      <div class="module">
-        <div class="mod-header">
-          <span class="mod-icon">🔧</span>
-          <span class="mod-title">2.5 — ConfigMaps, Secrets y StatefulSets</span>
-          <span class="mod-duration">Semana 5 — Teoría + Lab</span>
-        </div>
-
-        <div class="theory-block">
-          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">ConfigMap: externalizar configuración</span></div>
-          <div class="theory-body">
-            <p>Un <strong>ConfigMap</strong> almacena datos de configuración no sensibles como pares clave-valor. El principio de las 12-factor apps dicta que la configuración debe estar separada del código.</p>
-            <p>Formas de consumir un ConfigMap en un pod:</p>
-            <ul>
-              <li><strong>envFrom.configMapRef</strong> — inyecta todas las claves como variables de entorno.</li>
-              <li><strong>env.valueFrom.configMapKeyRef</strong> — inyecta una clave específica como variable de entorno.</li>
-              <li><strong>volumeMounts</strong> — monta el ConfigMap como archivos. Útil para archivos de configuración completos (nginx.conf, application.properties).</li>
-            </ul>
-            <p><strong>Limitación importante:</strong> cuando actualizas un ConfigMap, los pods existentes NO se reinician automáticamente (a menos que uses herramientas como Reloader). Con volúmenes, el archivo se actualiza eventualmente. Con envFrom, necesitas reiniciar el pod.</p>
-          </div>
-        </div>
-
-        <div class="theory-block">
-          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Secret: datos sensibles en Kubernetes</span></div>
-          <div class="theory-body">
-            <p>Los <strong>Secrets</strong> son similares a los ConfigMaps pero para datos sensibles. Los datos se almacenan en base64 (no es encriptación — solo codificación). Por defecto, los Secrets en etcd NO están encriptados a menos que configures Encryption at Rest.</p>
-            <p>Tipos de Secrets:</p>
-            <ul>
-              <li><strong>Opaque</strong> — tipo genérico. Para cualquier dato sensible.</li>
-              <li><strong>kubernetes.io/tls</strong> — certificados TLS (cert + key).</li>
-              <li><strong>kubernetes.io/dockerconfigjson</strong> — credenciales de registro de Docker privado.</li>
-              <li><strong>kubernetes.io/service-account-token</strong> — tokens de Service Accounts.</li>
-            </ul>
-            <p><strong>Buenas prácticas de seguridad:</strong> nunca los commitees en git en texto plano. Usa <code>stringData</code> en los YAMLs localmente pero agrega los archivos de Secret al .gitignore. En producción usa Sealed Secrets, External Secrets Operator, o integra con HashiCorp Vault / GCP Secret Manager.</p>
-          </div>
-        </div>
-
-        <div class="theory-block">
-          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">StatefulSet vs Deployment: cuándo usar cada uno</span></div>
-          <div class="theory-body">
-            <p>Un <strong>StatefulSet</strong> gestiona aplicaciones que necesitan identidad persistente. A diferencia de los Deployments:</p>
-            <ul>
-              <li><strong>Identidad estable:</strong> los pods se llaman <code>nombre-0</code>, <code>nombre-1</code>, <code>nombre-2</code>. Siempre el mismo nombre tras un reinicio.</li>
-              <li><strong>Almacenamiento estable:</strong> cada pod tiene su propio PVC que persiste si el pod se elimina. Con Deployments, todos los pods comparten el mismo PVC.</li>
-              <li><strong>Orden de despliegue:</strong> se crean y destruyen en orden determinístico (0 → 1 → 2, y al eliminar en orden inverso).</li>
-              <li><strong>DNS estable:</strong> cada pod tiene su propio registro DNS: <code>nombre-0.headless-svc.namespace.svc.cluster.local</code>.</li>
-            </ul>
-            <p><strong>Cuándo usar StatefulSet:</strong> bases de datos (PostgreSQL, MySQL, MongoDB), sistemas de mensajería (Kafka, RabbitMQ), cualquier app que necesite identidad persistente por pod.</p>
-            <p><strong>Cuándo usar Deployment:</strong> aplicaciones sin estado (stateless) como APIs REST, frontends, workers.</p>
-          </div>
-        </div>
-
-        <ul class="task-list">
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Entender ConfigMaps: 3 formas de consumirlos, limitación de actualización automática</span><span class="ttag tt-theory">teoría</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Entender Secrets: base64 ≠ encriptación, tipos, buenas prácticas en producción</span><span class="ttag tt-theory">teoría</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Entender StatefulSet: identidad estable, PVC por pod, orden de despliegue</span><span class="ttag tt-theory">teoría</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Convertir el Deployment de PostgreSQL a StatefulSet con volumeClaimTemplates</span><span class="ttag tt-lab">lab</span></li>
-          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Crear un CronJob en Python que haga pg_dump cada hora dentro del cluster</span><span class="ttag tt-lab">lab</span></li>
-        </ul>
-      </div>
-
     </div>
   </div><!-- /phase 2 -->
 
