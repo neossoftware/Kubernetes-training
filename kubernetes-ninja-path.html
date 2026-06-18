@@ -7044,6 +7044,47 @@ kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/con
           </div>
         </div>
 
+        <!-- Troubleshooting -->
+        <div class="theory-block orange">
+          <div class="theory-header"><span class="theory-tag orange">Troubleshooting</span><span class="theory-title">Problemas comunes al desplegar los Pods</span></div>
+          <div class="theory-body">
+
+            <p><strong>ContainerCreating — los Pods tardan en arrancar</strong></p>
+            <p>Es normal la primera vez. K8s está descargando las imágenes <code>nginx:1.25-alpine</code> y <code>node:20-alpine</code> de Docker Hub. Monitorea el progreso en tiempo real:</p>
+            <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:12px;font-size:.82rem;">kubectl get pods -n lab3-1 -w
+<span class="c"># NAME                        READY   STATUS              AGE</span>
+<span class="c"># api-695fd76d9c-q6dqq        0/1     ContainerCreating   30s   ← descargando imagen</span>
+<span class="c"># blue-app-575646c6c5-vzdg6   0/1     ContainerCreating   45s</span>
+<span class="c"># ... espera hasta que todos digan Running 1/1</span>
+<span class="c"># api-695fd76d9c-q6dqq        1/1     Running             90s   ✅</span></pre>
+            <p>Pulsa <code>Ctrl+C</code> para salir del watch cuando todos estén <code>Running</code>.</p>
+
+            <p style="margin-top:16px;"><strong>ImagePullBackOff — error al descargar la imagen</strong></p>
+            <p>Ocurre cuando Docker Hub rechaza la descarga (rate limit, sin conexión, o fallo transitorio de red). K8s reintenta automáticamente con backoff exponencial (30s → 1min → 2min…). Si lleva más de 3 minutos sin resolverse, fuerza un retry manual:</p>
+            <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:12px;font-size:.82rem;"><span class="c"># Ver el error exacto</span>
+kubectl describe pod -l app=blue-app -n lab3-1 | grep -A8 "Events:"
+<span class="c"># Events:</span>
+<span class="c">#   Warning  Failed  BackOff pulling image "nginx:1.25-alpine"</span>
+
+<span class="c"># Forzar retry del Deployment (crea Pods nuevos)</span>
+kubectl rollout restart deployment/blue-app -n lab3-1
+kubectl rollout restart deployment/green-app -n lab3-1
+kubectl rollout restart deployment/api -n lab3-1</pre>
+
+            <p style="margin-top:16px;"><strong>El log dice "ContainerCreating" al hacer kubectl logs</strong></p>
+            <p>El comando <code>kubectl logs</code> falla si el container aún no arrancó. Espera a que el Pod esté <code>Running</code> y vuelve a intentarlo:</p>
+            <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:12px;font-size:.82rem;"><span class="c"># Error que verás si el Pod no está listo:</span>
+<span class="c"># Error from server (BadRequest): container "api" in pod "api-xxx" is waiting to start: ContainerCreating</span>
+
+<span class="c"># Primero verifica que el Pod esté Running</span>
+kubectl get pods -n lab3-1
+<span class="c"># Cuando veas 1/1 Running, ya puedes ver los logs:</span>
+kubectl logs -l app=api -n lab3-1 --tail=2
+<span class="c"># API running on :3000</span></pre>
+
+          </div>
+        </div>
+
         <ul class="task-list">
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Instalar ingress-nginx en Docker Desktop y verificar EXTERNAL-IP=localhost</span><span class="ttag tt-lab">lab</span></li>
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Entender Ingress Resource vs Ingress Controller — son dos componentes distintos</span><span class="ttag tt-theory">teoría</span></li>
