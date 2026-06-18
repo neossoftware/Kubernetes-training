@@ -48,7 +48,7 @@ kubectl cluster-info
 ## Step 1 — Instalar ingress-nginx
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
 ```
 
 Docker Desktop crea automáticamente un Service `LoadBalancer` para el controller que se mapea a `localhost:80`.
@@ -209,7 +209,7 @@ kubectl delete namespace lab3-1
 
 # El ingress-nginx controller se puede dejar instalado para labs siguientes
 # o desinstalarlo con:
-kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
 ```
 
 ---

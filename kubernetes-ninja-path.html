@@ -6796,7 +6796,7 @@ ingress-nginx-controller   LoadBalancer   localhost     80:3xxxx/TCP, 443:3xxxx/
                                  localhost:80 al controller</pre>
             <p>En producción (AWS/GCP/Azure) el mismo comando crea una IP pública real (ELB, ALB, etc.) — el manifest YAML no cambia.</p>
             <p><strong>Comando de instalación para Docker Desktop:</strong></p>
-            <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:14px;font-size:.82rem;overflow-x:auto;">kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml</pre>
+            <pre style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:14px;font-size:.82rem;overflow-x:auto;">kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml</pre>
             <p>Nota: usa el provider <code>cloud</code> (no <code>baremetal</code>) porque Docker Desktop soporta LoadBalancer nativo.</p>
           </div>
         </div>
@@ -6865,7 +6865,7 @@ ingress-nginx-controller   LoadBalancer   localhost     80:3xxxx/TCP, 443:3xxxx/
               <div class="step-num">1</div>
               <div class="step-body">
                 <div class="step-title">Instalar ingress-nginx</div>
-                <pre>kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml</pre>
+                <pre>kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml</pre>
 
                 <p>Verás este output — es lo esperado. Cada línea es un recurso que Kubernetes creó para que el controller funcione:</p>
 
@@ -7037,7 +7037,7 @@ kubectl delete namespace lab3-1
 
 <span class="c"># El ingress-nginx controller puede quedar instalado para labs siguientes</span>
 <span class="c"># Si quieres desinstalarlo:</span>
-kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml</pre>
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml</pre>
               </div>
             </div>
 
