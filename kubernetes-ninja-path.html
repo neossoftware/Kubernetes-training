@@ -7126,10 +7126,317 @@ kubectl logs -l app=api -n lab3-1 --tail=2
           <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Verificar load balancing entre réplicas de la API con hostname rotando</span><span class="ttag tt-lab">lab</span></li>
         </ul>
       </div>
+
+      <!-- ─── Lab 3-2: Microservicios ─── -->
+      <div class="module">
+        <div class="mod-header">
+          <span class="mod-icon">🔀</span>
+          <span class="mod-title">3.2 — Lab 3-2: Microservicios con Ingress — React + Spring Boot × 2 + PostgreSQL externo</span>
+          <span class="mod-duration">Semana 6-7 — Lab completo</span>
+        </div>
+
+        <!-- Theory 1: Qué es una arquitectura de microservicios -->
+        <div class="theory-block green">
+          <div class="theory-header"><span class="theory-tag green">Teoría</span><span class="theory-title">De monolito a microservicios — y por qué Ingress es la pieza clave</span></div>
+          <div class="theory-body">
+            <p>En un monolito, clientes, productos y pedidos son módulos del mismo proceso. Si el módulo de productos necesita escalar, escalas todo el monolito. Con microservicios, cada dominio es un servicio independiente: su propio Deployment, su propia base de datos, su propio ciclo de releases.</p>
+            <p>El reto es la exposición: no puedes dar una IP pública a cada microservicio. <strong>Ingress resuelve esto</strong> — actúa como una recepción inteligente que enruta al servicio correcto según la URL, sin que el browser conozca nada de la topología interna.</p>
+            <pre style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:14px;font-size:.82rem;overflow-x:auto;">SIN Ingress — el cliente conoce cada servicio:
+  browser → localhost:8080/customers  (port-forward manual)
+  browser → localhost:8081/products   (port-forward manual)
+
+CON Ingress — un único punto de entrada:
+  browser → http://localhost/api/customers  →  customers-svc
+  browser → http://localhost/api/products   →  products-svc
+  browser → http://localhost/              →  frontend React</pre>
+          </div>
+        </div>
+
+        <!-- Theory 2: BD externa al cluster -->
+        <div class="theory-block">
+          <div class="theory-header"><span class="theory-tag">Teoría</span><span class="theory-title">Base de datos fuera de Kubernetes — el patrón más común en migraciones reales</span></div>
+          <div class="theory-body">
+            <p>En empresas que migran gradualmente a K8s, la base de datos suele ser lo último en moverse. Existe desde antes, tiene backups, réplicas y políticas de seguridad. Los microservicios en K8s se conectan a ella por hostname.</p>
+            <p>En este lab simulamos ese escenario: PostgreSQL corre en Docker fuera del cluster. Los Pods lo alcanzan via <code>host.docker.internal</code> — el hostname especial que Docker Desktop expone para que los Pods del cluster accedan a servicios del host Mac.</p>
+            <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:14px;font-size:.82rem;overflow-x:auto;">Pod (dentro de K8s VM)
+  │
+  │  jdbc:postgresql://host.docker.internal:5432/customersdb
+  ▼
+Docker Desktop VM network bridge
+  │
+  ▼
+PostgreSQL container (puerto 5432 en macOS host)
+  ▌
+  customersdb ← customers-api
+  productsdb  ← products-api</pre>
+            <p><strong>En producción</strong> (AWS/GCP), <code>host.docker.internal</code> se reemplaza por el endpoint de RDS/Cloud SQL. El YAML del Secret cambia; el código de la app, no.</p>
+          </div>
+        </div>
+
+        <!-- Theory 3: Ingress Prefix vs Rewrite -->
+        <div class="theory-block purple">
+          <div class="theory-header"><span class="theory-tag purple">Teoría</span><span class="theory-title">Prefix routing sin rewrite — cómo Spring Boot context-path elimina la necesidad de rewrite-target</span></div>
+          <div class="theory-body">
+            <p>En Lab 3-1 usamos <code>rewrite-target: /$2</code> porque los backends (nginx) servían desde <code>/</code>. Aquí hacemos algo más limpio: configuramos Spring Boot con <code>server.servlet.context-path=/api</code>. Así el backend <em>espera</em> recibir rutas que empiezan con <code>/api</code>, y el Ingress puede hacer <code>Prefix</code> puro sin reescribir nada.</p>
+            <table style="width:100%;border-collapse:collapse;font-size:.85rem;margin-top:10px;">
+              <thead><tr style="background:#f5f3ff;"><th style="padding:7px 10px;text-align:left;">Request del browser</th><th style="padding:7px 10px;text-align:left;">Ingress envía a</th><th style="padding:7px 10px;text-align:left;">Spring Boot recibe</th><th style="padding:7px 10px;text-align:left;">Controller maneja</th></tr></thead>
+              <tbody>
+                <tr style="border-top:1px solid #ddd6fe;"><td style="padding:7px 10px;"><code>GET /api/customers</code></td><td style="padding:7px 10px;">customers-svc:8080</td><td style="padding:7px 10px;"><code>GET /api/customers</code></td><td style="padding:7px 10px;"><code>@GetMapping("/customers")</code></td></tr>
+                <tr style="border-top:1px solid #ddd6fe;"><td style="padding:7px 10px;"><code>GET /api/customers/1</code></td><td style="padding:7px 10px;">customers-svc:8080</td><td style="padding:7px 10px;"><code>GET /api/customers/1</code></td><td style="padding:7px 10px;"><code>@GetMapping("/customers/{id}")</code></td></tr>
+                <tr style="border-top:1px solid #ddd6fe;"><td style="padding:7px 10px;"><code>GET /</code></td><td style="padding:7px 10px;">frontend-svc:80</td><td style="padding:7px 10px;"><code>GET /</code></td><td style="padding:7px 10px;">nginx sirve <code>index.html</code></td></tr>
+              </tbody>
+            </table>
+            <p style="margin-top:10px;">El path más largo gana: <code>/api/customers</code> (14 chars) tiene prioridad sobre <code>/</code> (1 char) — sin necesidad de anotaciones.</p>
+          </div>
+        </div>
+
+        <!-- Lab overview -->
+        <div class="lab-overview">
+          <div class="lab-overview-box lov-what">
+            <h4>¿Qué aprenderás?</h4>
+            <ul>
+              <li>Arquitectura de microservicios en Kubernetes con Ingress como API Gateway</li>
+              <li>Cómo conectar Pods a una BD que vive fuera del cluster (<code>host.docker.internal</code>)</li>
+              <li><code>pathType: Prefix</code> sin <code>rewrite-target</code> usando <code>context-path</code> en Spring Boot</li>
+              <li>Un Secret compartido con claves distintas por microservicio (<code>DB_NAME_CUSTOMERS</code> / <code>DB_NAME_PRODUCTS</code>)</li>
+              <li>Por qué el path más largo tiene prioridad en Ingress</li>
+              <li>Patrón de migración gradual: BD fuera de K8s, apps dentro</li>
+            </ul>
+          </div>
+          <div class="lab-overview-box lov-goals">
+            <h4>¿Qué construirás?</h4>
+            <ul>
+              <li>PostgreSQL en Docker con <strong>customersdb</strong> y <strong>productsdb</strong> (fuera del cluster)</li>
+              <li><strong>customers-api</strong> — Spring Boot 3 + JPA + CRUD completo</li>
+              <li><strong>products-api</strong> — Spring Boot 3 + JPA + CRUD completo</li>
+              <li><strong>Frontend React</strong> con tabs Clientes y Productos, CRUD en vivo</li>
+              <li>Ingress que enruta <code>/api/customers</code>, <code>/api/products</code> y <code>/</code></li>
+              <li>Verificar que los datos sobreviven al borrar los Pods (BD externa)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="lab-block">
+          <div class="lab-header"><div class="lab-dot ld-blue"></div><span class="lab-label">LAB 3-2 — React + Spring Boot × 2 + PostgreSQL externo via Ingress</span></div>
+          <div class="lab-content">
+
+            <!-- Architecture diagram -->
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px 24px;margin-bottom:20px;">
+              <div style="font-size:.78rem;font-weight:700;letter-spacing:.08em;color:#64748b;text-transform:uppercase;margin-bottom:12px;">Arquitectura del Lab</div>
+              <pre style="background:none;border:none;padding:0;margin:0;font-size:.8rem;line-height:1.65;overflow-x:auto;">Browser → http://localhost
+                │
+    ┌───────────┼──────────────────────────────┐
+    │      ingress-nginx Controller             │
+    │                                           │
+    │  /api/customers  ──►  customers-svc:8080  │
+    │  /api/products   ──►  products-svc:8080   │
+    │  /               ──►  frontend-svc:80     │
+    └───────────────────────────────────────────┘
+          │                  │              │
+    customers-svc       products-svc   frontend-svc
+    (ClusterIP)         (ClusterIP)    (ClusterIP)
+          │                  │              │
+   customers Pod×2     products Pod×2  frontend Pod×2
+   (Spring Boot 3)     (Spring Boot 3) (React + nginx)
+          │                  │
+          └────────┬──────────┘
+                   │ host.docker.internal:5432
+                   ▼
+        PostgreSQL (Docker — FUERA de K8s)
+        ├── customersdb  ←  customers-api
+        └── productsdb   ←  products-api
+                   namespace: lab3-2</pre>
+              <div style="margin-top:12px;font-size:.82rem;color:#475569;line-height:1.6;">
+                <strong>Clave:</strong> PostgreSQL no vive en Kubernetes. Simula una BD corporativa existente.
+                Los Pods la alcanzan via <code>host.docker.internal</code> — un hostname especial de Docker Desktop.
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <div class="step-title">Levantar PostgreSQL en Docker (fuera del cluster)</div>
+                <pre>docker run -d   --name lab3-postgres   -e POSTGRES_USER=admin   -e POSTGRES_PASSWORD=ninja123   -p 5432:5432   postgres:16-alpine
+
+<span class="c"># Crear las dos bases de datos — una por microservicio</span>
+docker exec lab3-postgres psql -U admin -c "CREATE DATABASE customersdb;"
+docker exec lab3-postgres psql -U admin -c "CREATE DATABASE productsdb;"
+
+docker exec lab3-postgres psql -U admin -l
+<span class="c">#  customersdb  | admin  ✅</span>
+<span class="c">#  productsdb   | admin  ✅</span></pre>
+                <p>Este PostgreSQL vive en Docker fuera del cluster. Los Pods lo alcanzan via <code>host.docker.internal:5432</code> — el hostname que Docker Desktop expone automáticamente para alcanzar el host Mac.</p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <div class="step-title">Construir las imágenes (Maven descarga dependencias la primera vez)</div>
+                <pre>cd section03-network-ingress-helm/lab-3-2-microservices
+
+<span class="c"># Spring Boot — multi-stage: Maven build → JRE Alpine (~3–5 min primera vez)</span>
+docker build -t lab3-2-customers:1.0 ./customers-api
+docker build -t lab3-2-products:1.0  ./products-api
+
+<span class="c"># React — Vite build → nginx Alpine</span>
+docker build -t lab3-2-frontend:1.0  ./frontend
+
+docker images | grep lab3-2
+<span class="c"># lab3-2-customers   1.0   ...</span>
+<span class="c"># lab3-2-frontend    1.0   ...</span>
+<span class="c"># lab3-2-products    1.0   ...</span></pre>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <div class="step-title">Crear namespace y Secret con credenciales de PostgreSQL</div>
+                <pre>kubectl apply -f k8s/namespace.yaml
+<span class="c"># namespace/lab3-2 created</span>
+
+kubectl apply -f k8s/secret.yaml
+<span class="c"># secret/postgres-secret created</span></pre>
+                <p>El Secret tiene una clave distinta por microservicio: <code>DB_NAME_CUSTOMERS=customersdb</code> y <code>DB_NAME_PRODUCTS=productsdb</code>. Ambos comparten usuario, password y host del mismo Secret.</p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">4</div>
+              <div class="step-body">
+                <div class="step-title">Desplegar los microservicios y el frontend</div>
+                <pre>kubectl apply -f k8s/customers-deployment.yaml
+kubectl apply -f k8s/products-deployment.yaml
+kubectl apply -f k8s/frontend-deployment.yaml
+
+<span class="c"># Spring Boot tarda ~30s en arrancar (JVM + conexión a BD)</span>
+kubectl get pods -n lab3-2 -w
+<span class="c"># NAME                         READY   STATUS    AGE</span>
+<span class="c"># customers-xxxx-aaaa          1/1     Running   35s</span>
+<span class="c"># customers-xxxx-bbbb          1/1     Running   35s</span>
+<span class="c"># frontend-xxxx-aaaa           1/1     Running   20s</span>
+<span class="c"># frontend-xxxx-bbbb           1/1     Running   20s</span>
+<span class="c"># products-xxxx-aaaa           1/1     Running   30s</span>
+<span class="c"># products-xxxx-bbbb           1/1     Running   30s</span></pre>
+                <p>Al arrancar, cada Spring Boot ejecuta el <code>CommandLineRunner</code> que verifica si la tabla está vacía e inserta datos de ejemplo. Con 2 réplicas, JPA ejecuta <code>CREATE TABLE IF NOT EXISTS</code> de forma idempotente.</p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">5</div>
+              <div class="step-body">
+                <div class="step-title">Crear el Ingress</div>
+                <pre>kubectl apply -f k8s/ingress.yaml
+<span class="c"># ingress.networking.k8s.io/lab3-2-ingress created</span>
+
+kubectl get ingress -n lab3-2
+<span class="c"># NAME             CLASS   HOSTS   ADDRESS     PORTS</span>
+<span class="c"># lab3-2-ingress   nginx   *       localhost   80</span></pre>
+                <p>No se usa <code>rewrite-target</code>. Con <code>pathType: Prefix</code>, el Ingress reenvía la URL completa al backend. Spring Boot la recibe completa (<code>/api/customers</code>) y la resuelve gracias a su <code>context-path=/api</code>.</p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">6</div>
+              <div class="step-body">
+                <div class="step-title">Probar los microservicios directamente</div>
+                <pre><span class="c"># Customers API</span>
+curl -s http://localhost/api/customers | python3 -m json.tool
+<span class="c"># [{"id":1,"name":"Ana García","email":"ana@empresa.com","phone":"+52 55 1234 5678",...}]</span>
+
+<span class="c"># Products API</span>
+curl -s http://localhost/api/products | python3 -m json.tool
+<span class="c"># [{"id":1,"name":"Laptop Pro 15","price":1299.99,"stock":10,...}]</span>
+
+<span class="c"># Crear un nuevo cliente</span>
+curl -s -X POST http://localhost/api/customers   -H "Content-Type: application/json"   -d '{"name":"Pedro Martínez","email":"pedro@empresa.com","phone":"+52 55 9999 0000"}'
+<span class="c"># {"id":4,"name":"Pedro Martínez","email":"pedro@empresa.com",...}</span>
+
+<span class="c"># Crear un nuevo producto</span>
+curl -s -X POST http://localhost/api/products   -H "Content-Type: application/json"   -d '{"name":"Webcam 4K","price":79.99,"stock":30,"description":"USB-C 4K 30fps"}'
+<span class="c"># {"id":5,"name":"Webcam 4K","price":79.99,...}</span></pre>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">7</div>
+              <div class="step-body">
+                <div class="step-title">Abrir el Frontend React</div>
+                <pre>open http://localhost    <span class="c"># macOS</span></pre>
+                <p>Verás dos tabs: <strong>👥 Clientes</strong> y <strong>📦 Productos</strong>. Cada tab muestra el CRUD en vivo conectado a su microservicio. Agrega, edita y elimina registros — los cambios persisten en PostgreSQL fuera del cluster.</p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">8</div>
+              <div class="step-body">
+                <div class="step-title">Demostrar que los datos sobreviven al borrar los Pods</div>
+                <pre><span class="c"># Agregar un cliente desde la UI o con curl</span>
+curl -s -X POST http://localhost/api/customers   -H "Content-Type: application/json"   -d '{"name":"Test Persistencia","email":"test@lab.com"}'
+
+<span class="c"># Borrar TODOS los Pods del microservicio customers</span>
+kubectl delete pod -l app=customers -n lab3-2
+<span class="c"># K8s los recrea automáticamente</span>
+
+kubectl get pods -l app=customers -n lab3-2 -w
+<span class="c"># ... nuevos Pods en Running</span>
+
+<span class="c"># Los datos siguen ahí — viven en PostgreSQL, no en los Pods</span>
+curl -s http://localhost/api/customers | python3 -c   "import sys,json; [print(c['name']) for c in json.load(sys.stdin)]"
+<span class="c"># Ana García</span>
+<span class="c"># Carlos López</span>
+<span class="c"># María Rodríguez</span>
+<span class="c"># Test Persistencia  ✅</span></pre>
+                <p>La BD es externa al ciclo de vida de los Pods. Aunque K8s destruya y recree todos los Pods, los datos persisten en PostgreSQL Docker.</p>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">9</div>
+              <div class="step-body">
+                <div class="step-title">Verificar logs de Spring Boot</div>
+                <pre><span class="c"># Ver que customers-api se conectó a customersdb</span>
+kubectl logs -l app=customers -n lab3-2 --tail=5
+<span class="c"># HikariPool-1 - Start completed.</span>
+<span class="c"># Started CustomersApplication in 4.3 seconds</span>
+
+<span class="c"># Ver que products-api se conectó a productsdb</span>
+kubectl logs -l app=products -n lab3-2 --tail=5
+<span class="c"># HikariPool-1 - Start completed.</span>
+<span class="c"># Started ProductsApplication in 4.1 seconds</span></pre>
+              </div>
+            </div>
+
+            <div class="lab-step">
+              <div class="step-num">10</div>
+              <div class="step-body">
+                <div class="step-title">Limpiar</div>
+                <pre><span class="c"># Elimina todos los recursos K8s del lab</span>
+kubectl delete namespace lab3-2
+
+<span class="c"># Detener PostgreSQL Docker (opcional — déjalo si harás más labs)</span>
+docker stop lab3-postgres && docker rm lab3-postgres</pre>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Levantar PostgreSQL en Docker con customersdb y productsdb fuera de K8s</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Entender por qué Ingress Prefix no necesita rewrite-target si Spring Boot usa context-path</span><span class="ttag tt-theory">teoría</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Construir y desplegar customers-api y products-api como microservicios independientes</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">✅ Lab 3-2: Frontend React + 2 microservicios Spring Boot accesibles desde http://localhost</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Demostrar que borrar los Pods no borra los datos (BD externa al cluster)</span><span class="ttag tt-lab">lab</span></li>
+          <li class="task-item" onclick="toggleTask(this)"><div class="task-check"></div><span class="task-text">Entender host.docker.internal y por qué en producción se reemplaza por el endpoint de la BD</span><span class="ttag tt-theory">teoría</span></li>
+        </ul>
+      </div>
+
       <div class="module">
         <div class="mod-header">
           <span class="mod-icon">⚓</span>
-          <span class="mod-title">3.2 — Helm: Package Manager de Kubernetes</span>
+          <span class="mod-title">3.3 — Helm: Package Manager de Kubernetes</span>
           <span class="mod-duration">Semana 7-8 — Teoría + Lab</span>
         </div>
 
